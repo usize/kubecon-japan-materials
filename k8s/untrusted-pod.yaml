@@ -1,0 +1,32 @@
+# A plain curl pod with NO kagenti labels — no sidecar injection,
+# no SPIFFE identity, no credentials. Used in Stage 2 to contrast
+# with the properly-identified finance agent.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: untrusted-curl
+  namespace: team1
+  labels:
+    app.kubernetes.io/name: untrusted-curl
+    app.kubernetes.io/part-of: fintech-demo
+    # Intentionally NO kagenti.io/inject label — no sidecar
+spec:
+  restartPolicy: Never
+  containers:
+    - name: curl
+      image: curlimages/curl:8.10.1
+      command: ["sleep", "3600"]
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        runAsUser: 100
+        capabilities:
+          drop: ["ALL"]
+      resources:
+        limits:
+          cpu: 100m
+          memory: 32Mi
+        requests:
+          cpu: 10m
+          memory: 8Mi

@@ -1,0 +1,22 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: finance-mcp-route
+  namespace: team1
+  labels:
+    mcp-server: "true"
+    app.kubernetes.io/part-of: fintech-demo
+spec:
+  parentRefs:
+  - name: mcp-gateway
+    namespace: gateway-system
+  hostnames:
+  - "finance-mcp.mcp.local"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: finance-mcp
+      port: 8888

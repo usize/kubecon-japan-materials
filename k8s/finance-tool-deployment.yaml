@@ -1,0 +1,68 @@
+# ============================================================================
+# finance-tool — Vincent's market data MCP server (placeholder).
+#
+# This manifest is a stub. When Vincent's finance-tool code lands in the
+# repo, fill in the correct image, ports, and environment variables.
+# The deployment pattern mirrors finance-mcp.yaml from the SPARC demo.
+# ============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: finance-tool
+  namespace: team1
+  labels:
+    app.kubernetes.io/name: finance-tool
+    app.kubernetes.io/part-of: fintech-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: finance-tool
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: finance-tool
+        app.kubernetes.io/part-of: fintech-demo
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: finance-tool
+          # TODO: replace with the actual image when available
+          image: finance-tool:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            limits:
+              cpu: 200m
+              memory: 128Mi
+            requests:
+              cpu: 20m
+              memory: 32Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: finance-tool
+  namespace: team1
+  labels:
+    app.kubernetes.io/name: finance-tool
+    app.kubernetes.io/part-of: fintech-demo
+spec:
+  selector:
+    app.kubernetes.io/name: finance-tool
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
+      name: http
+  type: ClusterIP

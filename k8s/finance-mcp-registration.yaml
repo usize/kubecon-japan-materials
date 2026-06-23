@@ -1,0 +1,14 @@
+apiVersion: mcp.kuadrant.io/v1alpha1
+kind: MCPServerRegistration
+metadata:
+  name: finance-mcp-servers
+  namespace: team1
+  labels:
+    app.kubernetes.io/part-of: fintech-demo
+spec:
+  toolPrefix: txn_
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: finance-mcp-route
+    namespace: team1
