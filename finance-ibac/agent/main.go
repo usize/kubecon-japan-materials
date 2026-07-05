@@ -16,6 +16,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -28,7 +29,17 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"go.opentelemetry.io/otel/trace"
 )
+
+var tracer trace.Tracer
 
 // --- OpenAI-compatible chat API structs ---
 
@@ -399,6 +410,14 @@ func extractBlockedBody(httpResult string) string {
 }
 
 func runAgent(query string, sessionID string) (string, error) {
+	ctx, span := tracer.Start(context.Background(), "agent.run",
+		trace.WithAttributes(
+			attribute.String("user.query", query),
+			attribute.String("session.id", sessionID),
+		))
+	defer span.End()
+	_ = ctx // used by traced tool calls below
+
 	messages := []ChatMessage{
 		{Role: "system", Content: systemPrompt},
 		{Role: "user", Content: query},
@@ -409,14 +428,38 @@ func runAgent(query string, sessionID string) (string, error) {
 	var blockedBody string
 	const maxBlocked = 1
 	for i := 0; i < 10; i++ {
+		_, llmSpan := tracer.Start(ctx, "llm.chat",
+			trace.WithAttributes(
+				attribute.Int("llm.iteration", i),
+				attribute.Int("llm.message_count", len(messages)),
+				attribute.String("llm.model", envOr("OLLAMA_MODEL", "llama3.2:3b")),
+			))
 		resp, err := callOllama(messages, true)
 		if err != nil {
+			llmSpan.RecordError(err)
+			llmSpan.End()
 			return "", err
 		}
 		if len(resp.Choices) == 0 {
+			llmSpan.End()
 			return "", fmt.Errorf("no choices in response")
 		}
 		msg := resp.Choices[0].Message
+		if msg.Content != "" {
+			contentAttr := msg.Content
+			if len(contentAttr) > 2048 {
+				contentAttr = contentAttr[:2048] + "..."
+			}
+			llmSpan.SetAttributes(attribute.String("llm.response", contentAttr))
+		}
+		if len(msg.ToolCalls) > 0 {
+			var names []string
+			for _, tc := range msg.ToolCalls {
+				names = append(names, tc.Function.Name)
+			}
+			llmSpan.SetAttributes(attribute.String("llm.tool_calls", strings.Join(names, ",")))
+		}
+		llmSpan.End()
 
 		if len(msg.ToolCalls) == 0 {
 			if parsed := parseTextToolCall(msg.Content); parsed != nil {
@@ -446,6 +489,13 @@ func runAgent(query string, sessionID string) (string, error) {
 				log.Printf("[Agent] Failed to parse tool arguments: %v", err)
 				args = map[string]interface{}{}
 			}
+
+			_, toolSpan := tracer.Start(ctx, "tool."+tc.Function.Name,
+				trace.WithAttributes(
+					attribute.String("tool.name", tc.Function.Name),
+					attribute.String("tool.arguments", tc.Function.Arguments),
+				))
+
 			var result string
 			switch tc.Function.Name {
 			case "http_post":
@@ -455,12 +505,22 @@ func runAgent(query string, sessionID string) (string, error) {
 					if blockedBody == "" {
 						blockedBody = extractBlockedBody(result)
 					}
+					toolSpan.SetAttributes(attribute.String("tool.blocked", "true"))
 				}
 			case "get_news":
 				result = execGetNews(args)
 			default:
 				result = fmt.Sprintf("unknown tool: %s", tc.Function.Name)
 			}
+
+			// Truncate result for span attribute (OTEL has size limits)
+			resultAttr := result
+			if len(resultAttr) > 4096 {
+				resultAttr = resultAttr[:4096] + "... (truncated)"
+			}
+			toolSpan.SetAttributes(attribute.String("tool.result", resultAttr))
+			toolSpan.End()
+
 			log.Printf("[Agent] Tool result (%s): %.200s...", tc.Function.Name, result)
 			messages = append(messages, ChatMessage{
 				Role: "tool", Content: result, ToolCallID: tc.ID,
@@ -666,7 +726,34 @@ func writeRPCError(w http.ResponseWriter, id any, code int, message string) {
 	})
 }
 
+func initTracer() func() {
+	endpoint := envOr("OTEL_EXPORTER_OTLP_ENDPOINT", "otel-collector.kagenti-system.svc.cluster.local:4318")
+	exp, err := otlptracehttp.New(context.Background(),
+		otlptracehttp.WithEndpoint(endpoint),
+		otlptracehttp.WithInsecure(),
+	)
+	if err != nil {
+		log.Printf("[Agent] OTEL exporter init failed (%v) — tracing disabled", err)
+		tracer = otel.Tracer("finance-news-agent")
+		return func() {}
+	}
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exp),
+		sdktrace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String("finance-news-agent"),
+		)),
+	)
+	otel.SetTracerProvider(tp)
+	tracer = tp.Tracer("finance-news-agent")
+	log.Printf("[Agent] OTEL tracing enabled → %s", endpoint)
+	return func() { _ = tp.Shutdown(context.Background()) }
+}
+
 func main() {
+	shutdown := initTracer()
+	defer shutdown()
+
 	proxiedClient = buildProxiedClient()
 
 	http.HandleFunc("/", handleA2A)

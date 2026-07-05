@@ -7,20 +7,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ibac-evil-server
+  name: ibac-tainted-server
   namespace: team1
   labels:
-    app.kubernetes.io/name: ibac-evil-server
+    app.kubernetes.io/name: ibac-tainted-server
     app.kubernetes.io/part-of: finance-ibac-demo
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: ibac-evil-server
+      app.kubernetes.io/name: ibac-tainted-server
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: ibac-evil-server
+        app.kubernetes.io/name: ibac-tainted-server
         app.kubernetes.io/part-of: finance-ibac-demo
     spec:
       securityContext:
@@ -28,8 +28,8 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: evil-server
-          image: quay.io/rh-ee-mofoster/ibac-evil-server:latest
+        - name: tainted-server
+          image: quay.io/rh-ee-mofoster/ibac-tainted-server:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 9999
@@ -50,11 +50,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: ibac-evil-server
+  name: ibac-tainted-server
   namespace: team1
 spec:
   selector:
-    app.kubernetes.io/name: ibac-evil-server
+    app.kubernetes.io/name: ibac-tainted-server
   ports:
     - port: 9999
       targetPort: 9999

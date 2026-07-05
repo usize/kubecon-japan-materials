@@ -29,12 +29,12 @@ commentary "Deploying tool backends..."
 kubectl apply -f "$SPARC_FINANCE_MCP"
 kubectl apply -f "$DEMO_DIR/k8s/finance-tool-deployment.yaml"
 kubectl apply -f "$DEMO_DIR/finance-ibac/k8s/news-server.yaml"
-kubectl apply -f "$DEMO_DIR/finance-ibac/k8s/evil-server.yaml"
+kubectl apply -f "$DEMO_DIR/finance-ibac/k8s/tainted-server.yaml"
 
 kubectl -n "$NAMESPACE" rollout status deploy/finance-mcp --timeout=120s
 kubectl -n "$NAMESPACE" rollout status deploy/finance-tool --timeout=120s
 kubectl -n "$NAMESPACE" rollout status deploy/ibac-news-server --timeout=120s
-kubectl -n "$NAMESPACE" rollout status deploy/ibac-evil-server --timeout=120s
+kubectl -n "$NAMESPACE" rollout status deploy/ibac-tainted-server --timeout=120s
 
 # ── Register with MCP Gateway ────────────────────────────────────────────
 commentary "Registering all backends with MCP Gateway..."

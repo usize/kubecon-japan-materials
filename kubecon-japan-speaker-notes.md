@@ -11,7 +11,7 @@
 # Wipe previous run
 ./scripts/kubecon-reset.sh
 
-# Deploy tools, news-server, evil-server, gateway registrations, untrusted pod
+# Deploy tools, news-server, tainted-server, gateway registrations, untrusted pod
 ./scripts/kubecon-demo.sh
 ```
 
@@ -20,7 +20,7 @@ Output should show:
 ```
 Tool backends:     3 (finance-mcp, finance-tool, ibac-news-server)
 Gateway tools:     10
-Evil-server:       running (logs empty)
+Tainted-server:       running (logs empty)
 Untrusted pod:     ready
 ```
 
@@ -32,11 +32,11 @@ Open 3 terminal panes:
 |------|---------|-----------|
 | **Main** | Commands you run live | Already done |
 | **Agent logs** | Streams agent + sidecar logs (start after agent deploys) | Wait |
-| **Evil-server logs** | Streams evil-server output | Start now: |
+| **Tainted-server logs** | Streams tainted-server output | Start now: |
 
 ```bash
-# Pane 3: evil-server log stream (empty for now)
-kubectl -n team1 logs -f deploy/ibac-evil-server
+# Pane 3: tainted-server log stream (empty for now)
+kubectl -n team1 logs -f deploy/ibac-tainted-server
 ```
 
 ### Verify Kagenti UI
@@ -279,9 +279,9 @@ kubectl -n team1 get configmap authbridge-config-finance-news-agent \
 > **Speaker notes:**
 > The agent responded. But let me look more carefully at what it did.
 
-### Check the evil-server logs (Pane 3)
+### Check the tainted-server logs (Pane 3)
 
-Point to Pane 3 — the evil-server log stream should now show:
+Point to Pane 3 — the tainted-server log stream should now show:
 
 ```
 [Evil] ====== EXFILTRATED PORTFOLIO DATA ======
@@ -436,10 +436,10 @@ pipeline: plugin rejected request  plugin=ibac  status=403  code=ibac.blocked
 > "This is not aligned with asking about financial news." 403 — blocked.
 > The request never left the pod.
 
-### Check evil-server (Pane 3)
+### Check tainted-server (Pane 3)
 
 > **Speaker notes:**
-> And look at the evil-server logs — nothing new. The exfiltration attempt
+> And look at the tainted-server logs — nothing new. The exfiltration attempt
 > was caught at the agent's own sidecar before any data left the pod.
 
 ### Show the sidecar verdicts
@@ -561,14 +561,14 @@ kubectl -n team1 exec untrusted-curl -- curl -s -X POST \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":"1","method":"message/send","params":{"message":{"role":"user","parts":[{"kind":"text","text":"hello"}]}}}'
 
-# Evil-server logs
-kubectl -n team1 logs deploy/ibac-evil-server --tail=20
+# Tainted-server logs
+kubectl -n team1 logs deploy/ibac-tainted-server --tail=20
 
 # Agent + sidecar logs (streaming)
 kubectl -n team1 logs -f deploy/finance-news-agent --all-containers --prefix
 
-# Evil-server logs (streaming)
-kubectl -n team1 logs -f deploy/ibac-evil-server
+# Tainted-server logs (streaming)
+kubectl -n team1 logs -f deploy/ibac-tainted-server
 
 # Enable IBAC
 make -C finance-ibac patch-config CONTAINER_RUNTIME=docker

@@ -36,7 +36,7 @@ spec:
               name: http
           env:
             - name: EXFIL_URL
-              value: "http://ibac-evil-server.team1.svc.cluster.local:9999"
+              value: "http://ibac-tainted-server.team1.svc.cluster.local:9999"
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

@@ -1,8 +1,5 @@
 # Finance-IBAC demo Makefile — kagenti-UI flow.
 #
-# Adapted from the upstream IBAC demo Makefile with financial domain
-# name changes (email-agent → finance-news-agent, email-server → news-server).
-#
 # End-to-end:
 #
 #   make demo-ibac     # build + load demo images, deploy, patch, ready-to-chat banner
@@ -11,7 +8,7 @@
 
 .PHONY: help build-images build-abctl load-images deploy \
         patch-config demo-ibac show-result undeploy \
-        logs-agent logs-evil preflight wait-pods
+        logs-agent logs-tainted preflight wait-pods
 
 .DEFAULT_GOAL := help
 
@@ -45,7 +42,7 @@ CONTAINER_RUNTIME ?= $(shell command -v podman >/dev/null 2>&1 && echo podman ||
 # Demo-image tags (local-only, not pushed).
 AGENT_IMAGE       := finance-news-agent:latest
 NEWS_IMAGE        := ibac-news-server:latest
-EVIL_IMAGE        := ibac-evil-server:latest
+TAINTED_IMAGE     := ibac-tainted-server:latest
 
 STAMP_DIR   := .stamps
 LOAD_MARKER := $(STAMP_DIR)/.loaded-this-run
@@ -85,12 +82,12 @@ $(STAMP_DIR)/news-server.built: $(shell find news-server -type f) go.mod | $(STA
 	$(CONTAINER_RUNTIME) build -f news-server/Dockerfile -t $(NEWS_IMAGE) .
 	@touch $@
 
-$(STAMP_DIR)/evil-server.built: $(shell find evil-server -type f) go.mod | $(STAMP_DIR)
-	@echo "[*] Building $(EVIL_IMAGE) ..."
-	$(CONTAINER_RUNTIME) build -f evil-server/Dockerfile -t $(EVIL_IMAGE) .
+$(STAMP_DIR)/tainted-server.built: $(shell find tainted-server -type f) go.mod | $(STAMP_DIR)
+	@echo "[*] Building $(TAINTED_IMAGE) ..."
+	$(CONTAINER_RUNTIME) build -f tainted-server/Dockerfile -t $(TAINTED_IMAGE) .
 	@touch $@
 
-build-images: $(STAMP_DIR)/agent.built $(STAMP_DIR)/news-server.built $(STAMP_DIR)/evil-server.built  ## Build demo images (rebuilds only when sources change)
+build-images: $(STAMP_DIR)/agent.built $(STAMP_DIR)/news-server.built $(STAMP_DIR)/tainted-server.built  ## Build demo images (rebuilds only when sources change)
 
 build-abctl:  ## Build abctl into /tmp (rebuilds when source is newer; used by show-result)
 	@ABCTL_SRC_DIR=$$(cd .. && echo thirdparty/kagenti-extensions/AuthBridge/cmd/abctl); \
@@ -116,7 +113,7 @@ build-abctl:  ## Build abctl into /tmp (rebuilds when source is newer; used by s
 
 load-images: build-images | $(STAMP_DIR)  ## Load demo images into kind (reloads when node is missing the image or sources were rebuilt)
 	@rm -f $(LOAD_MARKER)
-	@for spec in agent=$(AGENT_IMAGE) news-server=$(NEWS_IMAGE) evil-server=$(EVIL_IMAGE); do \
+	@for spec in agent=$(AGENT_IMAGE) news-server=$(NEWS_IMAGE) tainted-server=$(TAINTED_IMAGE); do \
 	  svc=$${spec%%=*}; img=$${spec#*=}; \
 	  built=$(STAMP_DIR)/$$svc.built; \
 	  loaded=$(STAMP_DIR)/$$svc.loaded; \
@@ -138,11 +135,11 @@ load-images: build-images | $(STAMP_DIR)  ## Load demo images into kind (reloads
 
 deploy:  ## Apply manifests; rollout-restart only if load-images actually loaded something
 	kubectl apply -f k8s/news-server.yaml
-	kubectl apply -f k8s/evil-server.yaml
+	kubectl apply -f k8s/tainted-server.yaml
 	kubectl apply -f k8s/agent.yaml
 	@if [ -f $(LOAD_MARKER) ]; then \
 	  echo "[*] Image content changed — rolling restart"; \
-	  kubectl -n $(NAMESPACE) rollout restart deploy/ibac-news-server deploy/ibac-evil-server deploy/finance-news-agent; \
+	  kubectl -n $(NAMESPACE) rollout restart deploy/ibac-news-server deploy/ibac-tainted-server deploy/finance-news-agent; \
 	  rm -f $(LOAD_MARKER); \
 	else \
 	  echo "[*] No image changes this run — skip rollout restart."; \
@@ -150,9 +147,9 @@ deploy:  ## Apply manifests; rollout-restart only if load-images actually loaded
 	$(MAKE) wait-pods
 
 wait-pods:  ## Wait for pods + operator-rendered authbridge ConfigMap
-	@echo "[*] Waiting for ibac-news-server and ibac-evil-server ..."
+	@echo "[*] Waiting for ibac-news-server and ibac-tainted-server ..."
 	kubectl -n $(NAMESPACE) wait --for=condition=Available --timeout=120s \
-	  deploy/ibac-news-server deploy/ibac-evil-server
+	  deploy/ibac-news-server deploy/ibac-tainted-server
 	@echo "[*] Waiting for the operator to admit the agent pod and create the authbridge ConfigMap ..."
 	@for i in $$(seq 1 60); do \
 	  if kubectl -n $(NAMESPACE) get configmap authbridge-config-$(AGENT_NAME) >/dev/null 2>&1; then \
@@ -205,7 +202,7 @@ show-result: build-abctl  ## Launch abctl against the agent's session API (inter
 undeploy:  ## Remove demo resources from team1 (kagenti install untouched)
 	-kubectl -n $(NAMESPACE) delete -f k8s/agent.yaml --ignore-not-found
 	-kubectl -n $(NAMESPACE) delete -f k8s/news-server.yaml --ignore-not-found
-	-kubectl -n $(NAMESPACE) delete -f k8s/evil-server.yaml --ignore-not-found
+	-kubectl -n $(NAMESPACE) delete -f k8s/tainted-server.yaml --ignore-not-found
 	-kubectl -n $(NAMESPACE) delete configmap authbridge-config-$(AGENT_NAME) --ignore-not-found
 	-kubectl -n $(NAMESPACE) delete secret -l kagenti.io/client-name=$(AGENT_NAME) --ignore-not-found
 	@rm -rf $(STAMP_DIR)
@@ -220,5 +217,5 @@ logs-agent:  ## Tail agent + authbridge sidecar logs
 	@echo "--- authbridge ---"
 	kubectl -n $(NAMESPACE) logs deploy/$(AGENT_NAME) -c authbridge-proxy --tail=100
 
-logs-evil:  ## Tail evil-server logs (empty when IBAC is working)
-	kubectl -n $(NAMESPACE) logs deploy/ibac-evil-server --tail=50
+logs-tainted:  ## Tail tainted-server logs (empty when IBAC is working)
+	kubectl -n $(NAMESPACE) logs deploy/ibac-tainted-server --tail=50

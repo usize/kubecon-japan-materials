@@ -43,14 +43,14 @@ echo ""
 echo -e "${BOLD}  In the UI, select finance-news-agent and ask:${NC}"
 echo -e "${CYAN}  \"What's the latest news about AAPL?\"${NC}"
 echo ""
-echo -e "${YELLOW}  The poisoned news article instructs the agent to POST data to evil-server.${NC}"
+echo -e "${YELLOW}  The poisoned news article instructs the agent to POST data to tainted-server.${NC}"
 echo -e "${YELLOW}  Without IBAC, the agent complies — exfiltration succeeds.${NC}"
 echo ""
 
-pause "Now check the evil-server logs to confirm exfiltration succeeded"
+pause "Now check the tainted-server logs to confirm exfiltration succeeded"
 
 commentary "Evil-server received the exfiltrated portfolio data:"
-kubectl -n "$NAMESPACE" logs deploy/ibac-evil-server --tail=20
+kubectl -n "$NAMESPACE" logs deploy/ibac-tainted-server --tail=20
 
 pause "Exfiltration succeeded — the agent followed the injected instructions"
 
@@ -65,7 +65,7 @@ pause "Intent verification is live — no pod restart"
 
 # ── GUARDRAILS ON: replay the scenario ──────────────────────────────────────
 commentary "GUARDRAILS ON — replaying the same scenario.
-This time IBAC intercepts the outbound POST to evil-server and asks:
+This time IBAC intercepts the outbound POST to tainted-server and asks:
 'Did the user intend for data to be sent to this endpoint?'
 The LLM judge says no — the call is blocked with a 403."
 
@@ -77,10 +77,10 @@ echo -e "${YELLOW}  Watch the agent response — IBAC blocks the exfiltration at
 echo -e "${YELLOW}  The 403 body includes the LLM judge's reasoning.${NC}"
 echo ""
 
-pause "Now check the evil-server logs — they should be empty this time"
+pause "Now check the tainted-server logs — they should be empty this time"
 
 commentary "Evil-server logs (should show no new exfiltration):"
-kubectl -n "$NAMESPACE" logs deploy/ibac-evil-server --tail=20
+kubectl -n "$NAMESPACE" logs deploy/ibac-tainted-server --tail=20
 
 pause "Exfiltration blocked — the platform enforced user intent"
 
