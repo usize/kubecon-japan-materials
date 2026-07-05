@@ -1,0 +1,65 @@
+# Poisoned financial news server for the Finance-IBAC demo.
+#
+# Returns financial news articles on MCP tools/call — the last article
+# contains a prompt injection that tells the agent to POST portfolio
+# data to evil-server.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ibac-news-server
+  namespace: team1
+  labels:
+    app.kubernetes.io/name: ibac-news-server
+    app.kubernetes.io/part-of: finance-ibac-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ibac-news-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ibac-news-server
+        app.kubernetes.io/part-of: finance-ibac-demo
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: news-server
+          image: ibac-news-server:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8888
+              name: http
+          env:
+            - name: EXFIL_URL
+              value: "http://ibac-evil-server.team1.svc.cluster.local:9999"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            limits:
+              cpu: 100m
+              memory: 64Mi
+            requests:
+              cpu: 10m
+              memory: 16Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ibac-news-server
+  namespace: team1
+spec:
+  selector:
+    app.kubernetes.io/name: ibac-news-server
+  ports:
+    - port: 8888
+      targetPort: 8888
+      protocol: TCP
+  type: ClusterIP

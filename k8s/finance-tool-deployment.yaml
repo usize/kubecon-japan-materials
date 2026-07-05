@@ -1,9 +1,8 @@
 # ============================================================================
-# finance-tool — Vincent's market data MCP server (placeholder).
+# finance-tool — Vincent's market data MCP server (yfinance via FastMCP).
 #
-# This manifest is a stub. When Vincent's finance-tool code lands in the
-# repo, fill in the correct image, ports, and environment variables.
-# The deployment pattern mirrors finance-mcp.yaml from the SPARC demo.
+# Listens on port 8000 with streamable-http transport. Registered with the
+# MCP Gateway via finance-tool-httproute.yaml + finance-tool-registration.yaml.
 # ============================================================================
 apiVersion: apps/v1
 kind: Deployment
@@ -30,7 +29,6 @@ spec:
           type: RuntimeDefault
       containers:
         - name: finance-tool
-          # TODO: replace with the actual image when available
           image: finance-tool:latest
           imagePullPolicy: IfNotPresent
           ports:
@@ -38,16 +36,15 @@ spec:
               name: http
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
           resources:
             limits:
-              cpu: 200m
-              memory: 128Mi
+              cpu: 500m
+              memory: 512Mi
             requests:
-              cpu: 20m
-              memory: 32Mi
+              cpu: 50m
+              memory: 128Mi
 ---
 apiVersion: v1
 kind: Service

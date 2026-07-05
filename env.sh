@@ -20,7 +20,7 @@ MCP_GATEWAY_URL="http://mcp-gateway-istio.gateway-system.svc.cluster.local:8080/
 KAGENTI_ROOT="$ZOO_ROOT/kagenti"
 EXTENSIONS_ROOT="$ZOO_ROOT/kagenti-extensions"
 SPARC_DEMO_DIR="$EXTENSIONS_ROOT/AuthBridge/demos/finance-sparc"
-IBAC_DEMO_DIR="$EXTENSIONS_ROOT/AuthBridge/demos/ibac"
+IBAC_DEMO_DIR="$DEMO_DIR/finance-ibac"
 SETUP_SCRIPT="$KAGENTI_ROOT/scripts/kind/setup-kagenti.sh"
 
 # Image names (local-only, not pushed)

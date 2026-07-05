@@ -1,0 +1,111 @@
+# Finance-IBAC demo financial-news-assistant agent — operator-injected,
+# kagenti-UI-discoverable.
+#
+# Adapted from the upstream IBAC demo's agent.yaml with name changes
+# (email-agent → finance-news-agent) and env changes (EMAIL_URL → NEWS_URL).
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: finance-news-agent
+  namespace: team1
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: finance-news-agent
+  namespace: team1
+  labels:
+    app.kubernetes.io/name: finance-news-agent
+    app.kubernetes.io/part-of: finance-ibac-demo
+    kagenti.io/type: agent
+    protocol.kagenti.io/a2a: ""
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: finance-news-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: finance-news-agent
+        app.kubernetes.io/part-of: finance-ibac-demo
+        kagenti.io/type: agent
+        kagenti.io/inject: enabled
+        kagenti.io/spire: disabled
+        protocol.kagenti.io/a2a: ""
+    spec:
+      serviceAccountName: finance-news-agent
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: agent
+          image: finance-news-agent:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: PORT
+              value: "8000"
+            - name: OLLAMA_URL
+              value: "http://host.docker.internal:11434"
+            - name: OLLAMA_MODEL
+              value: "llama3.2:3b"
+            - name: NEWS_URL
+              value: "http://ibac-news-server.team1.svc.cluster.local:8888"
+            - name: AGENT_PUBLIC_URL
+              value: "http://finance-news-agent.team1.svc.cluster.local:8080/"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            limits:
+              cpu: 500m
+              memory: 256Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+          volumeMounts:
+            - name: shared-data
+              mountPath: /shared
+      volumes:
+        - name: shared-data
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: finance-news-agent
+  namespace: team1
+  labels:
+    app.kubernetes.io/name: finance-news-agent
+    app.kubernetes.io/part-of: finance-ibac-demo
+spec:
+  selector:
+    app.kubernetes.io/name: finance-news-agent
+  ports:
+    - port: 8080
+      targetPort: 8000
+      protocol: TCP
+      name: http
+  type: ClusterIP
+
+---
+apiVersion: agent.kagenti.dev/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: finance-news-agent
+  namespace: team1
+spec:
+  type: agent
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: finance-news-agent

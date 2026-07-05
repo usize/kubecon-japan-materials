@@ -1,0 +1,16 @@
+[project]
+name = "finance_tool"
+version = "0.1.0"
+description = "Yahoo Finance MCP server for stock fundamentals, prices, financial statements, and news"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastmcp>=2.11.0",
+    "yfinance>=0.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+]

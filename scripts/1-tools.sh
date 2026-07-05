@@ -42,38 +42,56 @@ commentary "Deploying the finance-mcp backend (Deployment + Service)..."
 kubectl apply -f "$SPARC_DEMO_DIR/k8s/finance-mcp.yaml"
 wait_rollout "$NAMESPACE" finance-mcp
 
-# ── Register with MCP Gateway ──────────────────────────────────────────────
+# ── Register finance-mcp with MCP Gateway ─────────────────────────────────
 commentary "Registering finance-mcp with the MCP Gateway via HTTPRoute + MCPServerRegistration..."
 kubectl apply -f "$DEMO_DIR/k8s/finance-mcp-httproute.yaml"
 kubectl apply -f "$DEMO_DIR/k8s/finance-mcp-registration.yaml"
 
-# Restart the MCP Gateway broker so it immediately attempts to connect to the
-# newly registered backend (otherwise it can cache stale "not found" state).
-commentary "Restarting MCP Gateway broker to pick up new registration..."
+pause "finance-mcp registered"
+
+# ── Build + load finance-tool image ──────────────────────────────────────
+commentary "Building the finance-tool (market data) server image..."
+"$CONTAINER_RUNTIME" build \
+  -t "$FINANCE_TOOL_IMAGE" \
+  "$DEMO_DIR/finance-tool"
+
+commentary "Loading finance-tool image into Kind cluster..."
+kind load docker-image "$FINANCE_TOOL_IMAGE" --name "$CLUSTER_NAME"
+"$CONTAINER_RUNTIME" exec "$KIND_NODE" \
+  ctr -n k8s.io images tag "localhost/$FINANCE_TOOL_IMAGE" "docker.io/library/$FINANCE_TOOL_IMAGE" \
+  >/dev/null 2>&1 || true
+
+pause "finance-tool image built and loaded into Kind"
+
+# ── Deploy finance-tool ──────────────────────────────────────────────────
+commentary "Deploying the finance-tool backend (Deployment + Service)..."
+kubectl apply -f "$DEMO_DIR/k8s/finance-tool-deployment.yaml"
+wait_rollout "$NAMESPACE" finance-tool
+
+# ── Register finance-tool with MCP Gateway ───────────────────────────────
+commentary "Registering finance-tool with the MCP Gateway via HTTPRoute + MCPServerRegistration..."
+kubectl apply -f "$DEMO_DIR/k8s/finance-tool-httproute.yaml"
+kubectl apply -f "$DEMO_DIR/k8s/finance-tool-registration.yaml"
+
+# ── Restart MCP Gateway broker ───────────────────────────────────────────
+# Restart after both tools are registered so the broker picks up both
+# backends in a single reconnect cycle.
+commentary "Restarting MCP Gateway broker to pick up new registrations..."
 kubectl -n mcp-system rollout restart deploy/mcp-gateway
 kubectl -n mcp-system rollout status deploy/mcp-gateway --timeout=60s
 
-# Wait for registration to be accepted
-commentary "Waiting for MCPServerRegistration to be ready..."
-for i in $(seq 1 60); do
-  if kubectl get mcpserverregistrations -n "$NAMESPACE" finance-mcp-servers \
-       -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q True; then
-    break
-  fi
-  sleep 3
+# Wait for both registrations to be accepted
+commentary "Waiting for MCPServerRegistrations to be ready..."
+for reg in finance-mcp-servers finance-tool-servers; do
+  for i in $(seq 1 60); do
+    if kubectl get mcpserverregistrations -n "$NAMESPACE" "$reg" \
+         -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q True; then
+      break
+    fi
+    sleep 3
+  done
 done
 
 kubectl get mcpserverregistrations -n "$NAMESPACE"
 
-# ── Placeholder: finance-tool (Vincent's market data server) ────────────────
-# TODO: When Vincent's finance-tool lands in the repo:
-# 1. Build the image: $CONTAINER_RUNTIME build -t $FINANCE_TOOL_IMAGE <path>
-# 2. Load into kind: kind load docker-image $FINANCE_TOOL_IMAGE --name $CLUSTER_NAME
-# 3. Deploy: kubectl apply -f $DEMO_DIR/k8s/finance-tool-deployment.yaml
-# 4. Register: kubectl apply -f $DEMO_DIR/k8s/finance-tool-httproute.yaml
-#              kubectl apply -f $DEMO_DIR/k8s/finance-tool-registration.yaml
-commentary "Note: finance-tool (market data) is not yet available locally.
-The demo runs with the finance-mcp (transactions) backend.
-When finance-tool lands, uncomment the deployment section in this script."
-
-pause "Tool backend registered with MCP Gateway"
+pause "Both tool backends registered with MCP Gateway"
