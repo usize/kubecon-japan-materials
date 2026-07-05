@@ -29,8 +29,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: evil-server
-          image: ibac-evil-server:latest
-          imagePullPolicy: IfNotPresent
+          image: quay.io/rh-ee-mofoster/ibac-evil-server:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 9999
               name: http
