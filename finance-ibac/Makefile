@@ -93,9 +93,9 @@ $(STAMP_DIR)/evil-server.built: $(shell find evil-server -type f) go.mod | $(STA
 build-images: $(STAMP_DIR)/agent.built $(STAMP_DIR)/news-server.built $(STAMP_DIR)/evil-server.built  ## Build demo images (rebuilds only when sources change)
 
 build-abctl:  ## Build abctl into /tmp (rebuilds when source is newer; used by show-result)
-	@ABCTL_SRC_DIR=../../kagenti-extensions/AuthBridge/cmd/abctl; \
+	@ABCTL_SRC_DIR=$$(cd .. && echo thirdparty/kagenti-extensions/AuthBridge/cmd/abctl); \
 	if [ ! -d "$$ABCTL_SRC_DIR" ]; then \
-	  ABCTL_SRC_DIR=$$(cd .. && find ../kagenti-extensions -path '*/cmd/abctl' -type d 2>/dev/null | head -1); \
+	  ABCTL_SRC_DIR=$$(find ../thirdparty -path '*/cmd/abctl' -type d 2>/dev/null | head -1); \
 	fi; \
 	if [ -z "$$ABCTL_SRC_DIR" ] || [ ! -d "$$ABCTL_SRC_DIR" ]; then \
 	  echo "ERROR: Cannot find abctl source directory."; \

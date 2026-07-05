@@ -16,9 +16,9 @@ PLATFORM_NS="${PLATFORM_NS:-kagenti-system}"
 # MCP Gateway in-cluster URL (Istio Gateway controller)
 MCP_GATEWAY_URL="http://mcp-gateway-istio.gateway-system.svc.cluster.local:8080/mcp"
 
-# Paths to existing assets in the monorepo
-KAGENTI_ROOT="$ZOO_ROOT/kagenti"
-EXTENSIONS_ROOT="$ZOO_ROOT/kagenti-extensions"
+# Paths to dependencies (cloned into thirdparty/)
+KAGENTI_ROOT="$DEMO_DIR/thirdparty/kagenti"
+EXTENSIONS_ROOT="$DEMO_DIR/thirdparty/kagenti-extensions"
 SPARC_DEMO_DIR="$EXTENSIONS_ROOT/AuthBridge/demos/finance-sparc"
 IBAC_DEMO_DIR="$DEMO_DIR/finance-ibac"
 SETUP_SCRIPT="$KAGENTI_ROOT/scripts/kind/setup-kagenti.sh"
