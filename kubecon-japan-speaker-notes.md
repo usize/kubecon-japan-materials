@@ -5,8 +5,6 @@
 
 ---
 
-## Before You Go On Stage
-
 ### Reset and pre-deploy
 
 ```bash
@@ -17,7 +15,7 @@
 ./scripts/kubecon-demo.sh
 ```
 
-Wait for the script to finish. Confirm output shows:
+Output should show:
 
 ```
 Tool backends:     3 (finance-mcp, finance-tool, ibac-news-server)
@@ -80,15 +78,7 @@ kubectl get mcpserverregistrations -n team1
 > a financial news feed. The agent will connect to one URL and discover
 > all 10 tools automatically. The gateway handles routing by tool-name prefix.
 
-### Show the tool catalog (optional — if you want to go deeper)
-
-```bash
-# From inside the cluster, hit the gateway's tools/list
-kubectl -n team1 exec untrusted-curl -- curl -s \
-  http://mcp-gateway-istio.gateway-system.svc.cluster.local:8080/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":"1","method":"tools/list"}' | python3 -m json.tool | head -30
-```
+### Show the tool catalog 
 
 ---
 
@@ -123,6 +113,26 @@ Fill in:
 | Envoy + iptables interception | **NO** | "We're using HTTP_PROXY mode — lighter weight, no iptables rules needed." |
 | Enable SPIRE identity | **YES** | "This gives the agent a SPIFFE identity — a cryptographic workload identity issued by SPIRE. No API keys, no shared secrets." |
 
+**Outbound OIDC token exchange rules — add 1 route:**
+
+> **Speaker notes:**
+> This is where we wire up credential injection. When the agent calls
+> the MCP Gateway, the sidecar will exchange the agent's SPIFFE-derived
+> credential for a bearer token with a specific audience. The agent
+> never sees a credential — the sidecar handles it transparently.
+
+| Host Pattern | Target OIDC Audience | OIDC Token Scopes |
+|-------------|---------------------|-------------------|
+| `mcp-gateway*` | `mcp-gateway` | `openid` |
+
+> **Speaker notes:**
+> This means: when the agent makes any outbound call to a host matching
+> `mcp-gateway*`, the sidecar performs RFC 8693 token exchange with
+> Keycloak — exchanging the agent's identity for a scoped bearer token.
+> The gateway can then validate this token and enforce per-tool
+> authorization policies. Same mechanism works for any downstream
+> service — different hosts, different audiences, different scopes.
+
 **Environment variables:**
 
 Click **Import from File/URL** and select `finance-ibac/agent.env`, or add manually:
@@ -139,7 +149,9 @@ Click **Import from File/URL** and select `finance-ibac/agent.env`, or add manua
 > Notice what I did NOT configure: no TLS certificates, no OAuth client IDs,
 > no shared secrets. The platform handles all of that. The operator sees the
 > labels, injects the sidecar, registers the agent with Keycloak, and issues
-> a SPIFFE identity. The agent binary knows nothing about any of it.
+> a SPIFFE identity. The token exchange rule I just set up means the agent
+> gets authenticated access to the MCP Gateway automatically. The agent
+> binary knows nothing about any of it.
 
 Click **Deploy**.
 
@@ -203,11 +215,31 @@ Expected output:
 > immediately. This is zero-trust at the workload level — if you don't
 > have cryptographic identity, you don't get in. No network policies
 > needed, no firewall rules. The identity IS the policy.
+
+### Show the token exchange in action
+
+> **Speaker notes:**
+> Now let me show the outbound side. Remember the token exchange route
+> we configured? Let's look at what the sidecar does when the agent
+> calls the MCP Gateway.
+
+```bash
+# Show the authbridge config — look for the token-exchange route
+kubectl -n team1 get configmap authbridge-config-finance-news-agent \
+  -o jsonpath='{.data.config\.yaml}' | grep -A5 "token-exchange" | head -10
+```
+
+> **Speaker notes:**
+> The sidecar is configured to perform RFC 8693 token exchange whenever
+> the agent calls the MCP Gateway. It takes the agent's SPIFFE identity,
+> exchanges it with Keycloak for a bearer token scoped to the `mcp-gateway`
+> audience, and injects that token into the outbound request header.
+> The agent never touches a credential. The gateway validates the token
+> and knows exactly which agent is calling which tool.
 >
-> The AuthBridge sidecar also handles outbound token exchange. When the
-> agent calls the MCP Gateway, the sidecar transparently injects a bearer
-> token — RFC 8693 token exchange backed by Keycloak. The agent never
-> touches a credential.
+> This is the same mechanism you'd use to scope access per-tool or
+> per-backend — different hosts, different audiences, different scopes.
+> The sidecar handles it all transparently.
 
 ---
 
@@ -464,6 +496,40 @@ kubectl -n team1 logs deploy/finance-news-agent -c authbridge-proxy --tail=30 \
 > Check it out in the kagenti-extensions repo.
 >
 > Try it on a Kind cluster. Break it. Tell us what's missing. Thank you.
+
+---
+
+## Optional Extension: Agent Without Token Exchange
+
+> **Speaker notes:**
+> Want to show what happens without token exchange? Deploy a second
+> agent from the UI with the same settings but WITHOUT the outbound
+> OIDC token exchange route. The agent will still work (the default
+> outbound policy is passthrough), but the sidecar logs will show
+> no token injection — outbound calls go naked.
+
+To demonstrate:
+
+1. Import a second agent from the UI (e.g., `finance-news-agent-noauth`)
+2. Same image, same env vars
+3. AuthBridge: **YES**, SPIRE: **YES**
+4. **No outbound OIDC token exchange routes** (leave empty)
+5. Deploy and chat
+
+Then compare the sidecar logs side-by-side:
+
+```bash
+# Agent WITH token exchange — look for "token-exchange: modify" in outbound
+kubectl -n team1 logs deploy/finance-news-agent -c authbridge-proxy --tail=20
+
+# Agent WITHOUT — look for "token-exchange: passthrough" or no token header
+kubectl -n team1 logs deploy/finance-news-agent-noauth -c authbridge-proxy --tail=20
+```
+
+> **Speaker notes:**
+> Same agent binary. Same gateway. But one gets authenticated access
+> because the platform injects credentials — the other doesn't.
+> This is policy-as-configuration, not policy-as-code.
 
 ---
 
