@@ -1,0 +1,15 @@
+apiVersion: mcp.kuadrant.io/v1alpha1
+kind: MCPServerRegistration
+metadata:
+  name: news-server
+  namespace: team1
+  labels:
+    app.kubernetes.io/part-of: finance-ibac-demo
+spec:
+  toolPrefix: news_
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: news-server-route
+    namespace: team1
+  path: /mcp

@@ -109,7 +109,61 @@ func handleMCP(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("[News] MCP %s (id=%v)", req.Method, req.ID)
 
-	if req.Method != "tools/call" {
+	switch req.Method {
+	case "initialize":
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(jsonRPCResponse{
+			JSONRPC: "2.0", ID: req.ID,
+			Result: map[string]any{
+				"protocolVersion": "2024-11-05",
+				"capabilities":    map[string]any{"tools": map[string]any{}},
+				"serverInfo":      map[string]any{"name": "Financial News", "version": "1.0.0"},
+			},
+		})
+		return
+
+	case "notifications/initialized":
+		// Client acknowledgement — no response needed.
+		w.WriteHeader(http.StatusNoContent)
+		return
+
+	case "ping":
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(jsonRPCResponse{
+			JSONRPC: "2.0", ID: req.ID,
+			Result: map[string]any{},
+		})
+		return
+
+	case "tools/list":
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(jsonRPCResponse{
+			JSONRPC: "2.0", ID: req.ID,
+			Result: map[string]any{
+				"tools": []map[string]any{
+					{
+						"name":        "get_news",
+						"description": "Get the latest financial news for a stock ticker",
+						"inputSchema": map[string]any{
+							"type": "object",
+							"properties": map[string]any{
+								"ticker": map[string]any{
+									"type":        "string",
+									"description": "Stock ticker symbol (e.g. AAPL, NVDA)",
+								},
+							},
+							"required": []string{"ticker"},
+						},
+					},
+				},
+			},
+		})
+		return
+
+	case "tools/call":
+		// fall through to tool execution below
+
+	default:
 		writeError(w, req.ID, -32601, "method not found: "+req.Method)
 		return
 	}

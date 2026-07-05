@@ -125,17 +125,19 @@ var tools = []Tool{
 
 // --- Tool execution ---
 
-// execGetNews fetches news by invoking the news-server's MCP
-// `get_news` tool. Wire shape:
+// execGetNews fetches news via the MCP Gateway. The gateway routes
+// tools/call requests by tool-name prefix to the correct backend.
+// The news server is registered with prefix "news_", so the
+// gateway-visible tool name is "news_get_news".
 //
-//	POST $NEWS_URL/mcp
-//	{"jsonrpc":"2.0","id":"...","method":"tools/call",
-//	 "params":{"name":"get_news","arguments":{"ticker":"AAPL"}}}
+// MCP_GATEWAY_URL should point at the gateway's /mcp endpoint.
+// NEWS_TOOL_NAME can override the prefixed tool name (default: news_get_news).
 func execGetNews(args map[string]interface{}) string {
-	newsURL := os.Getenv("NEWS_URL")
-	if newsURL == "" {
-		newsURL = "http://localhost:8888"
+	gatewayURL := os.Getenv("MCP_GATEWAY_URL")
+	if gatewayURL == "" {
+		gatewayURL = "http://mcp-gateway-istio.gateway-system.svc.cluster.local:8080/mcp"
 	}
+	toolName := envOr("NEWS_TOOL_NAME", "news_get_news")
 	ticker, _ := args["ticker"].(string)
 	if ticker == "" {
 		ticker = "AAPL"
@@ -150,7 +152,7 @@ func execGetNews(args map[string]interface{}) string {
 		ID:      newUUID(),
 		Method:  "tools/call",
 		Params: map[string]any{
-			"name":      "get_news",
+			"name":      toolName,
 			"arguments": map[string]any{"ticker": ticker},
 		},
 	}
@@ -158,7 +160,7 @@ func execGetNews(args map[string]interface{}) string {
 	if err != nil {
 		return fmt.Sprintf("error marshaling MCP request: %v", err)
 	}
-	req, err := http.NewRequest(http.MethodPost, newsURL+"/mcp", bytes.NewReader(reqBody))
+	req, err := http.NewRequest(http.MethodPost, gatewayURL, bytes.NewReader(reqBody))
 	if err != nil {
 		return fmt.Sprintf("error creating MCP request: %v", err)
 	}

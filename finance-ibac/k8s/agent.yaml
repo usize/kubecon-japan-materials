@@ -55,8 +55,8 @@ spec:
               value: "http://host.docker.internal:11434"
             - name: OLLAMA_MODEL
               value: "llama3.2:3b"
-            - name: NEWS_URL
-              value: "http://ibac-news-server.team1.svc.cluster.local:8888"
+            - name: MCP_GATEWAY_URL
+              value: "http://mcp-gateway-istio.gateway-system.svc.cluster.local:8080/mcp"
             - name: AGENT_PUBLIC_URL
               value: "http://finance-news-agent.team1.svc.cluster.local:8080/"
           securityContext:
