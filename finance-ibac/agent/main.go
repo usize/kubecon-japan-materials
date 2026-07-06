@@ -136,19 +136,16 @@ var tools = []Tool{
 
 // --- Tool execution ---
 
-// execGetNews fetches news via the MCP Gateway. The gateway routes
-// tools/call requests by tool-name prefix to the correct backend.
-// The news server is registered with prefix "news_", so the
-// gateway-visible tool name is "news_get_news".
-//
-// MCP_GATEWAY_URL should point at the gateway's /mcp endpoint.
-// NEWS_TOOL_NAME can override the prefixed tool name (default: news_get_news).
+// execGetNews fetches news by calling the news server's MCP endpoint.
+// The news server is also registered with the MCP Gateway (prefix "news_"),
+// so the unified tool catalog includes it — but the agent calls it
+// directly since it's a dedicated tool, not a gateway-aggregated one.
 func execGetNews(args map[string]interface{}) string {
-	gatewayURL := os.Getenv("MCP_GATEWAY_URL")
-	if gatewayURL == "" {
-		gatewayURL = "http://mcp-gateway-istio.gateway-system.svc.cluster.local:8080/mcp"
+	newsURL := os.Getenv("NEWS_URL")
+	if newsURL == "" {
+		newsURL = "http://ibac-news-server.team1.svc.cluster.local:8888"
 	}
-	toolName := envOr("NEWS_TOOL_NAME", "news_get_news")
+	toolName := "get_news"
 	ticker, _ := args["ticker"].(string)
 	if ticker == "" {
 		ticker = "AAPL"
@@ -171,7 +168,7 @@ func execGetNews(args map[string]interface{}) string {
 	if err != nil {
 		return fmt.Sprintf("error marshaling MCP request: %v", err)
 	}
-	req, err := http.NewRequest(http.MethodPost, gatewayURL, bytes.NewReader(reqBody))
+	req, err := http.NewRequest(http.MethodPost, newsURL+"/mcp", bytes.NewReader(reqBody))
 	if err != nil {
 		return fmt.Sprintf("error creating MCP request: %v", err)
 	}
@@ -727,7 +724,11 @@ func writeRPCError(w http.ResponseWriter, id any, code int, message string) {
 }
 
 func initTracer() func() {
+	// The operator injects OTEL_EXPORTER_OTLP_ENDPOINT with http:// prefix,
+	// but otlptracehttp.WithEndpoint expects host:port only. Strip the scheme.
 	endpoint := envOr("OTEL_EXPORTER_OTLP_ENDPOINT", "otel-collector.kagenti-system.svc.cluster.local:4318")
+	endpoint = strings.TrimPrefix(endpoint, "http://")
+	endpoint = strings.TrimPrefix(endpoint, "https://")
 	exp, err := otlptracehttp.New(context.Background(),
 		otlptracehttp.WithEndpoint(endpoint),
 		otlptracehttp.WithInsecure(),
