@@ -15,7 +15,7 @@ spec:
   containers:
     - name: curl
       image: curlimages/curl:8.10.1
-      command: ["sleep", "3600"]
+      command: ["sleep", "86400"]
       securityContext:
         allowPrivilegeEscalation: false
         readOnlyRootFilesystem: true
