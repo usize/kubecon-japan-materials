@@ -4,105 +4,137 @@ theme: default
 paginate: true
 style: |
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
-  /* Rossoctl — red, black, gold, white */
+  /* Rossoctl — dark theme: red, black, gold, warm white */
+  :root {
+    --bg: #0e0e0e;
+    --bg-surface: #161616;
+    --bg-raised: #1e1e1e;
+    --red: #c0272d;
+    --red-light: #e8584f;
+    --gold: #d4a843;
+    --gold-dim: #a68832;
+    --amber: #f5c96a;
+    --text: #e8e4df;
+    --text-mid: #b0aaa2;
+    --text-dim: #706b64;
+    --white: #fff;
+    --code-green: #7ec699;
+  }
   section {
     font-family: 'IBM Plex Sans', 'Helvetica Neue', sans-serif;
     font-size: 26px;
     font-weight: 400;
-    color: #222;
+    color: var(--text);
+    background: var(--bg);
     padding: 40px 60px;
     letter-spacing: 0.01em;
   }
+  /* Lead / title slides */
   section.lead {
     text-align: center;
-    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #2a0a0a 100%);
-    color: #fff;
+    background: linear-gradient(160deg, #0a0a0a 0%, #111 40%, #1a0808 100%);
+    color: var(--white);
   }
   section.lead h1 {
     font-size: 46px;
     font-weight: 400;
     margin-bottom: 8px;
-    color: #fff;
+    color: var(--white);
     letter-spacing: -0.01em;
   }
   section.lead h2 {
     font-size: 26px;
     font-weight: 300;
-    color: #d4a843;
+    color: var(--gold);
     margin-top: 0;
   }
   section.lead p {
-    color: #ddd;
+    color: var(--text-mid);
     font-size: 22px;
   }
-  section.section-header {
-    background: #111;
-    color: #fff;
-  }
-  section.section-header h1 {
-    font-size: 40px;
-    font-weight: 400;
-    border-bottom: 2px solid #c0272d;
-    padding-bottom: 12px;
-    display: inline-block;
-  }
+  /* Headings */
   h1 {
-    color: #111;
+    color: var(--white);
     font-size: 34px;
     font-weight: 500;
     margin-bottom: 16px;
     letter-spacing: -0.01em;
   }
   h2 {
-    color: #222;
+    color: var(--gold);
     font-size: 28px;
     font-weight: 400;
   }
   h3 {
     font-weight: 500;
     font-size: 24px;
+    color: var(--text);
   }
+  /* Text styles */
   strong {
     font-weight: 600;
+    color: var(--white);
   }
+  em {
+    color: var(--red-light);
+    font-style: normal;
+    font-weight: 500;
+  }
+  a {
+    color: var(--gold);
+  }
+  li {
+    color: var(--text);
+  }
+  /* Blockquotes */
   blockquote {
-    border-left: 4px solid #c0272d;
+    border-left: 3px solid var(--red);
     padding: 8px 16px;
-    background: #fdf6f0;
+    background: var(--bg-raised);
     font-style: italic;
     margin: 16px 0;
-    color: #333;
+    color: var(--text-mid);
   }
+  /* Tables */
   table {
     font-size: 20px;
     width: 100%;
   }
   th {
-    background: #1a1a1a;
-    color: #fff;
+    background: var(--red);
+    color: var(--white);
     padding: 8px 12px;
     font-weight: 500;
     letter-spacing: 0.02em;
   }
   td {
     padding: 8px 12px;
-    border-bottom: 1px solid #ddd;
-    color: #222;
+    border-bottom: 1px solid #2a2a2a;
+    color: var(--text);
   }
+  tr:nth-child(even) td {
+    background: var(--bg-raised);
+  }
+  tr:nth-child(odd) td {
+    background: var(--bg-surface);
+  }
+  /* Code */
   code {
     font-family: 'IBM Plex Mono', 'Menlo', monospace;
     font-size: 18px;
     font-weight: 400;
-    background: #f5f0eb;
+    background: var(--bg-raised);
+    color: var(--amber);
     padding: 2px 6px;
     border-radius: 3px;
   }
   pre {
     font-size: 16px;
-    background: #111;
-    color: #e8e0d8;
+    background: var(--bg-surface);
+    color: var(--code-green);
     padding: 16px;
     border-radius: 8px;
+    border: 1px solid #2a2a2a;
   }
   pre code {
     background: none;
@@ -110,52 +142,45 @@ style: |
     color: inherit;
     font-weight: 400;
   }
+  /* Layout */
   .columns {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 24px;
   }
   .highlight {
-    color: #c0272d;
+    color: var(--red);
     font-weight: 600;
   }
   .subtle {
-    color: #999;
+    color: var(--text-dim);
     font-size: 20px;
   }
-  em {
-    color: #c0272d;
-    font-style: normal;
-    font-weight: 500;
+  /* Pagination */
+  section::after {
+    color: var(--text-dim);
   }
-  /* Demo slides — dark bg, force all text white */
-  section.demo, section.demo * {
-    color: #fff;
-  }
+  /* Demo slides */
   section.demo {
-    background: #0e0e0e;
+    background: var(--bg);
   }
   section.demo h1 {
     display: none;
   }
   section.demo em {
-    color: #e8584f;
+    color: var(--red-light);
   }
   section.demo code {
-    background: #2a2a2a;
-    color: #f5c96a;
-    font-weight: 400;
+    background: var(--bg-raised);
+    color: var(--amber);
   }
   section.demo pre, section.demo pre code {
-    background: #1a1a1a;
-    color: #e8e0d8;
+    background: var(--bg-surface);
+    color: var(--code-green);
   }
   section.demo blockquote {
-    background: #1a1a1a;
-    border-left-color: #c0272d;
-  }
-  section.demo blockquote p {
-    color: #ddd;
+    background: var(--bg-raised);
+    border-left-color: var(--red);
   }
   .demo-header {
     display: flex;
@@ -165,8 +190,8 @@ style: |
   }
   .demo-label {
     display: inline-block;
-    background: #c0272d;
-    color: #fff;
+    background: var(--red);
+    color: var(--white);
     padding: 4px 14px;
     border-radius: 3px;
     font-family: 'IBM Plex Mono', monospace;
@@ -182,7 +207,7 @@ style: |
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 2px;
-    color: #fff;
+    color: var(--text-mid);
   }
 ---
 
