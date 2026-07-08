@@ -1,4 +1,4 @@
-# Fintech Demo — Kubecon Japan
+# Agentic Deployment Demo - Kubecon Japan
 
 End-to-end demo showing four infrastructure patterns for running agentic AI on Kubernetes, using a financial agent as the through-line.
 
