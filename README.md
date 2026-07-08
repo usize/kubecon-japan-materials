@@ -6,7 +6,7 @@ End-to-end demo showing four infrastructure patterns for running agentic AI on K
 
 | Stage | Pattern | What you see |
 |-------|---------|-------------|
-| 0 | Platform Setup | Kind cluster + kagenti stack (SPIRE, MCP Gateway, UI, MLflow) |
+| 0 | Platform Setup | Kind cluster + rossoctl stack (SPIRE, MCP Gateway, UI, MLflow) |
 | 1 | Tool Aggregation | Multiple MCP backends behind one gateway endpoint |
 | 2 | Workload Identity | SPIFFE auto-injection, trusted vs untrusted contrast |
 | 3 | Happy Path | Live financial query through the full stack |
@@ -52,17 +52,14 @@ The talk slides are in `slides.md` (Marp format).
 ```bash
 npm install
 
-# Live preview with hot-reload
-npm run serve
-
-# Open in default browser
-npm run preview
-
-# Export
-npm run build:html   # slides.html
-npm run build:pdf    # slides.pdf (requires Chrome/Chromium)
-npm run build:pptx   # slides.pptx
+npm run serve     # Live preview with hot-reload
+npm run preview   # Open in default browser
+npm run build     # Build static site to docs/ (for GitHub Pages)
+npm run build:pdf # Export to PDF (requires Chrome/Chromium)
+npm run build:pptx # Export to PPTX
 ```
+
+The `docs/` directory is the static site for GitHub Pages. Run `npm run build` to regenerate after slide edits.
 
 Speaker notes are embedded as HTML comments (`<!-- ... -->`) in each slide.
 
@@ -78,6 +75,9 @@ Stage 4a/4b delegate to existing Makefiles in the SPARC and IBAC demo directorie
 fintech-demo/
 ├── README.md
 ├── kubecon-japan-demo-playbook.md    # Full demo playbook
+├── slides.md                         # Talk slides (Marp format)
+├── docs/                             # Static site for GitHub Pages
+├── videos/                           # Demo video clips
 ├── env.sh                            # Shared environment defaults
 ├── scripts/
 │   ├── lib.sh                        # Shared helpers (colors, pause, banner)

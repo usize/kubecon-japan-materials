@@ -39,13 +39,13 @@ Open 3 terminal panes:
 kubectl -n team1 logs -f deploy/ibac-tainted-server
 ```
 
-### Verify Kagenti UI
+### Verify Rossoctl UI
 
-Open browser to: **http://kagenti-ui.localtest.me:8080**
+Open browser to: **http://rossoctl-ui.localtest.me:8080**
 
 Login:
 - Username: `admin`
-- Password: *(from `kubectl -n keycloak get secret kagenti-test-user -o jsonpath='{.data.password}' | base64 -d`)*
+- Password: *(from `kubectl -n keycloak get secret rossoctl-test-user -o jsonpath='{.data.password}' | base64 -d`)*
 
 Confirm the agent list is empty (no agents deployed yet).
 
@@ -60,7 +60,7 @@ ollama list | grep llama3.2
 ## Section 1: "The Platform"
 
 > **Speaker notes:**
-> We have a Kubernetes cluster running the Kagenti platform. It provides
+> We have a Kubernetes cluster running the Rossoctl platform. It provides
 > three things that any platform team needs when running agentic workloads:
 > a protocol-aware gateway for tool access, cryptographic workload identity,
 > and runtime guardrails. Let me show you each one.
@@ -85,7 +85,7 @@ kubectl get mcpserverregistrations -n team1
 ## Section 2: "Deploy an Agent from the UI"
 
 > **Speaker notes:**
-> Now let's deploy an agent. The Kagenti UI lets us import any container
+> Now let's deploy an agent. The Rossoctl UI lets us import any container
 > image as an A2A agent. I'll walk through the configuration — this is
 > where the infrastructure security gets set up, without touching any
 > agent code.
@@ -109,7 +109,7 @@ Fill in:
 
 | Checkbox | Setting | What to say |
 |----------|---------|-------------|
-| Secure with Kagenti AuthBridge | **YES** | "This injects our AuthBridge sidecar proxy. It handles JWT validation inbound and token exchange outbound — the agent has zero awareness of any of this." |
+| Secure with Rossoctl RossoCortex | **YES** | "This injects our RossoCortex sidecar proxy. It handles JWT validation inbound and token exchange outbound — the agent has zero awareness of any of this." |
 | Envoy + iptables interception | **NO** | "We're using HTTP_PROXY mode — lighter weight, no iptables rules needed." |
 | Enable SPIRE identity | **YES** | "This gives the agent a SPIFFE identity — a cryptographic workload identity issued by SPIRE. No API keys, no shared secrets." |
 
@@ -161,7 +161,7 @@ Click **Deploy**.
 kubectl -n team1 get pods -w
 ```
 
-Wait until `finance-news-agent` shows `2/2 Running` (agent + authbridge sidecar).
+Wait until `finance-news-agent` shows `2/2 Running` (agent + rossocortex sidecar).
 
 ### Start agent log stream (Pane 2)
 
@@ -180,7 +180,7 @@ kubectl -n team1 logs -f deploy/finance-news-agent --all-containers --prefix
 ### Show the SPIFFE identity
 
 ```bash
-kubectl -n team1 exec deploy/finance-news-agent -c authbridge-proxy \
+kubectl -n team1 exec deploy/finance-news-agent -c rossocortex-proxy \
   -- cat /shared/client-id.txt
 ```
 
@@ -192,7 +192,7 @@ spiffe://localtest.me/ns/team1/sa/finance-news-agent
 > **Speaker notes:**
 > This SPIFFE ID was issued by SPIRE automatically when the pod started.
 > It's bound to the service account, the namespace, and the trust domain.
-> The AuthBridge sidecar uses it for mTLS and token exchange. The agent
+> The RossoCortex sidecar uses it for mTLS and token exchange. The agent
 > binary has no idea this exists.
 
 ### Show mTLS enforcement — untrusted pod rejected
@@ -211,7 +211,7 @@ Expected output:
 
 > **Speaker notes:**
 > Same cluster. Same namespace. But this pod has no SPIFFE identity, no
-> sidecar, no token. The AuthBridge sidecar on the agent rejected it
+> sidecar, no token. The RossoCortex sidecar on the agent rejected it
 > immediately. This is zero-trust at the workload level — if you don't
 > have cryptographic identity, you don't get in. No network policies
 > needed, no firewall rules. The identity IS the policy.
@@ -224,8 +224,8 @@ Expected output:
 > calls the MCP Gateway.
 
 ```bash
-# Show the authbridge config — look for the token-exchange route
-kubectl -n team1 get configmap authbridge-config-finance-news-agent \
+# Show the rossocortex config — look for the token-exchange route
+kubectl -n team1 get configmap rossocortex-config-finance-news-agent \
   -o jsonpath='{.data.config\.yaml}' | grep -A5 "token-exchange" | head -10
 ```
 
@@ -247,7 +247,7 @@ kubectl -n team1 get configmap authbridge-config-finance-news-agent \
 
 > **Speaker notes:**
 > Let's see the full stack working. I'll ask the agent a question through
-> the Kagenti UI, which speaks A2A — the Agent-to-Agent protocol. Watch
+> the Rossoctl UI, which speaks A2A — the Agent-to-Agent protocol. Watch
 > the logs.
 
 ### In the UI: Chat with the agent
@@ -260,7 +260,7 @@ kubectl -n team1 get configmap authbridge-config-finance-news-agent \
 
 > **Speaker notes (while waiting for response):**
 > What's happening right now: the UI sent an A2A JSON-RPC message/send
-> request. The AuthBridge sidecar validated the JWT. The agent's LLM
+> request. The RossoCortex sidecar validated the JWT. The agent's LLM
 > reasoned about the query. It called get_news through the MCP Gateway —
 > the gateway routed it to the news backend. The response is flowing back.
 
@@ -348,7 +348,7 @@ Actually, since we know the source, just describe it:
 ## Section 6: "Adding Guardrails — IBAC"
 
 > **Speaker notes:**
-> We can fix this without touching the agent. AuthBridge supports
+> We can fix this without touching the agent. RossoCortex supports
 > hot-reloadable guardrail plugins. I'm going to add intent verification
 > — a plugin called IBAC that captures the user's intent on inbound, then
 > judges every outbound request against that intent using an LLM.
@@ -393,7 +393,7 @@ Expected output:
 ### Verify the pipeline
 
 ```bash
-kubectl -n team1 get configmap authbridge-config-finance-news-agent \
+kubectl -n team1 get configmap rossocortex-config-finance-news-agent \
   -o jsonpath='{.data.config\.yaml}' | python3 -c '
 import yaml, sys
 c = yaml.safe_load(sys.stdin)
@@ -423,7 +423,7 @@ for d in ("inbound", "outbound"):
 
 ### Watch the sidecar logs (Pane 2)
 
-Point to the authbridge-proxy logs — they should show:
+Point to the rossocortex-proxy logs — they should show:
 
 ```
 pipeline: plugin rejected request  plugin=ibac  status=403  code=ibac.blocked
@@ -445,7 +445,7 @@ pipeline: plugin rejected request  plugin=ibac  status=403  code=ibac.blocked
 ### Show the sidecar verdicts
 
 ```bash
-kubectl -n team1 logs deploy/finance-news-agent -c authbridge-proxy --tail=30 \
+kubectl -n team1 logs deploy/finance-news-agent -c rossocortex-proxy --tail=30 \
   | grep -E "ibac|plugin rejected"
 ```
 
@@ -467,11 +467,11 @@ kubectl -n team1 logs deploy/finance-news-agent -c authbridge-proxy --tail=30 \
 > identity and policy.
 >
 > **Identity:** SPIFFE gives the agent a cryptographic identity at birth.
-> No API keys, no shared secrets. The AuthBridge sidecar uses it for mTLS
+> No API keys, no shared secrets. The RossoCortex sidecar uses it for mTLS
 > and token exchange — the agent never touches a credential.
 >
 > **Tool access:** The MCP Gateway federates tool backends behind a single
-> endpoint. AuthBridge injects tokens on outbound calls so the agent gets
+> endpoint. RossoCortex injects tokens on outbound calls so the agent gets
 > authorized access to downstream services. The agent connects to one URL
 > and discovers everything.
 >
@@ -485,15 +485,15 @@ kubectl -n team1 logs deploy/finance-news-agent -c authbridge-proxy --tail=30 \
 > LLM. You deploy your agent, the platform secures it.
 >
 > **Call to action:**
-> Everything you saw is open source. Kagenti is at kagenti.dev. The
-> AuthBridge guardrails — including SPARC for catching hallucinated tool
-> arguments — are in the kagenti-extensions repo. The MCP Gateway is a
+> Everything you saw is open source. Rossoctl is at rossoctl.dev. The
+> RossoCortex guardrails — including SPARC for catching hallucinated tool
+> arguments — are in the rossoctl-extensions repo. The MCP Gateway is a
 > CNCF project from Kuadrant.
 >
 > We also have a SPARC demo that shows how the same sidecar architecture
 > catches hallucinated tool arguments — an agent that fabricates a
 > transaction ID gets a reflection-based correction loop, no code changes.
-> Check it out in the kagenti-extensions repo.
+> Check it out in the rossoctl-extensions repo.
 >
 > Try it on a Kind cluster. Break it. Tell us what's missing. Thank you.
 
@@ -512,7 +512,7 @@ To demonstrate:
 
 1. Import a second agent from the UI (e.g., `finance-news-agent-noauth`)
 2. Same image, same env vars
-3. AuthBridge: **YES**, SPIRE: **YES**
+3. RossoCortex: **YES**, SPIRE: **YES**
 4. **No outbound OIDC token exchange routes** (leave empty)
 5. Deploy and chat
 
@@ -520,10 +520,10 @@ Then compare the sidecar logs side-by-side:
 
 ```bash
 # Agent WITH token exchange — look for "token-exchange: modify" in outbound
-kubectl -n team1 logs deploy/finance-news-agent -c authbridge-proxy --tail=20
+kubectl -n team1 logs deploy/finance-news-agent -c rossocortex-proxy --tail=20
 
 # Agent WITHOUT — look for "token-exchange: passthrough" or no token header
-kubectl -n team1 logs deploy/finance-news-agent-noauth -c authbridge-proxy --tail=20
+kubectl -n team1 logs deploy/finance-news-agent-noauth -c rossocortex-proxy --tail=20
 ```
 
 > **Speaker notes:**
@@ -539,7 +539,7 @@ kubectl -n team1 logs deploy/finance-news-agent-noauth -c authbridge-proxy --tai
 
 | Service | URL |
 |---------|-----|
-| Kagenti UI | http://kagenti-ui.localtest.me:8080 |
+| Rossoctl UI | http://rossoctl-ui.localtest.me:8080 |
 | MLflow | http://mlflow.localtest.me:8080 |
 | MCP Inspector | http://mcp-inspector.localtest.me:8080 |
 
@@ -553,7 +553,7 @@ kubectl -n team1 logs deploy/finance-news-agent-noauth -c authbridge-proxy --tai
 ./scripts/kubecon-reset.sh
 
 # Agent SPIFFE identity
-kubectl -n team1 exec deploy/finance-news-agent -c authbridge-proxy -- cat /shared/client-id.txt
+kubectl -n team1 exec deploy/finance-news-agent -c rossocortex-proxy -- cat /shared/client-id.txt
 
 # Untrusted pod contrast
 kubectl -n team1 exec untrusted-curl -- curl -s -X POST \
@@ -574,13 +574,13 @@ kubectl -n team1 logs -f deploy/ibac-tainted-server
 make -C finance-ibac patch-config CONTAINER_RUNTIME=docker
 
 # Sidecar IBAC verdicts
-kubectl -n team1 logs deploy/finance-news-agent -c authbridge-proxy --tail=30 | grep -E "ibac|plugin rejected"
+kubectl -n team1 logs deploy/finance-news-agent -c rossocortex-proxy --tail=30 | grep -E "ibac|plugin rejected"
 
 # Show MCP Gateway registrations
 kubectl get mcpserverregistrations -n team1
 
-# Show authbridge pipeline config
-kubectl -n team1 get configmap authbridge-config-finance-news-agent \
+# Show rossocortex pipeline config
+kubectl -n team1 get configmap rossocortex-config-finance-news-agent \
   -o jsonpath='{.data.config\.yaml}' | python3 -c '
 import yaml, sys
 c = yaml.safe_load(sys.stdin)
@@ -596,7 +596,7 @@ for d in ("inbound", "outbound"):
 ### Credentials
 
 ```bash
-# Kagenti UI login
+# Rossoctl UI login
 echo "Username: admin"
-echo "Password: $(kubectl -n keycloak get secret kagenti-test-user -o jsonpath='{.data.password}' | base64 -d)"
+echo "Password: $(kubectl -n keycloak get secret rossoctl-test-user -o jsonpath='{.data.password}' | base64 -d)"
 ```

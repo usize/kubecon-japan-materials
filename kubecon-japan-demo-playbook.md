@@ -3,7 +3,7 @@
 **Talk:** Securing Agentic AI at the Infrastructure Layer — Identity, Authorization, and Runtime Guardrails
 **Speakers:** Vincent Caldeira (APAC CTO), ...
 **Date:** TBD
-**Status:** Draft — design review
+**Status:** Active
 
 ---
 
@@ -11,7 +11,7 @@
 
 > As organizations move beyond basic LLM integrations toward autonomous agentic workflows, the infrastructure required to support these systems grows increasingly complex. Running multi-agent architectures in production introduces unique challenges around tool discovery, secure access, and traffic routing.
 >
-> This session explores how to leverage Kubernetes and cloud-native abstractions to develop, test, and deploy AI agents at scale. Using a reference architecture leveraging the Kagenti project, we will demonstrate how to construct a secure, scalable agentic environment. The talk covers unifying tool access via an MCP Gateway, enforcing zero-trust workload identity with SPIFFE/SPIRE, and standardizing inter-agent communication.
+> This session explores how to leverage Kubernetes and cloud-native abstractions to develop, test, and deploy AI agents at scale. Using a reference architecture leveraging the Rossoctl project, we will demonstrate how to construct a secure, scalable agentic environment. The talk covers unifying tool access via an MCP Gateway, enforcing zero-trust workload identity with SPIFFE/SPIRE, and standardizing inter-agent communication.
 >
 > To illustrate these concepts, we will walk through a real-world financial use case: an autonomous agent that securely accesses market data and executes simulated transactions using financial tools over MCP, demonstrating end-to-end cloud-native deployment.
 
@@ -79,7 +79,7 @@ This means the live demo flow for each guardrail is:
 
 - **[Kuadrant MCP Gateway](https://github.com/Kuadrant/mcp-gateway)** (v0.7.1, CNCF Sandbox via Kuadrant) — Envoy-based gateway with ext_proc for MCP protocol awareness. Uses `MCPServerRegistration` CRDs for Kubernetes-native tool registration.
 - **Vincent's [finance_tool](https://github.com/caldeirav/agent-examples/tree/main/mcp/finance_tool)** — FastMCP server wrapping `yfinance`. Registered as one backend.
-- **[finance-mcp](kagenti-extensions/AuthBridge/demos/finance-sparc/finance-mcp/)** from the SPARC demo — Go MCP server with transaction tools. Registered as a second backend.
+- **[finance-mcp](rossoctl-extensions/RossoCortex/demos/finance-sparc/finance-mcp/)** from the SPARC demo — Go MCP server with transaction tools. Registered as a second backend.
 
 ### How It Works
 
@@ -116,8 +116,8 @@ Each backend gets:
 
 - [MCP Gateway architecture overview](https://docs.kuadrant.io/1.4.x/mcp-gateway/docs/design/overview/)
 - [Installing MCP Gateway](https://docs.kuadrant.io/dev/mcp-gateway/docs/guides/how-to-install-and-configure/)
-- [Introducing MCP-Gateway in Kagenti](https://medium.com/kagenti-the-agentic-platform/introducing-mcp-gateway-in-kagenti-a-unified-front-door-for-your-mcp-servers-28db5b6ef62d) (Medium)
-- Kagenti setup flag: `scripts/kind/setup-kagenti.sh --with-mcp-gateway`
+- [Introducing MCP-Gateway in Rossoctl](https://medium.com/rossoctl-the-agentic-platform/introducing-mcp-gateway-in-rossoctl-a-unified-front-door-for-your-mcp-servers-28db5b6ef62d) (Medium)
+- Rossoctl setup flag: `scripts/kind/setup-rossoctl.sh --with-mcp-gateway`
 
 ---
 
@@ -129,8 +129,8 @@ Each backend gets:
 
 ### Components
 
-- **SPIFFE/SPIRE** — auto-injected into agent pods. Each gets an X.509 SVID with a SPIFFE ID like `spiffe://kagenti.example.com/ns/team1/sa/finance-agent`.
-- **Sidecar proxy** (AuthBridge) — injected transparently. Handles inbound JWT validation and outbound RFC 8693 token exchange.
+- **SPIFFE/SPIRE** — auto-injected into agent pods. Each gets an X.509 SVID with a SPIFFE ID like `spiffe://rossoctl.example.com/ns/team1/sa/finance-agent`.
+- **Sidecar proxy** (RossoCortex) — injected transparently. Handles inbound JWT validation and outbound RFC 8693 token exchange.
 - **Keycloak** — OIDC provider. The agent's SPIFFE ID auto-registers as a Keycloak client.
 - **mTLS** — encrypted agent-to-gateway communication using SPIRE-issued certificates.
 
@@ -138,21 +138,21 @@ Each backend gets:
 
 1. Show the agent pod's SPIFFE ID:
    ```
-   kubectl exec -n team1 deploy/finance-agent -c authbridge-proxy \
+   kubectl exec -n team1 deploy/finance-agent -c rossocortex-proxy \
      -- cat /shared/client-id.txt
    ```
 2. Show the auto-registered Keycloak client (Keycloak admin UI or API)
 3. **Trusted agent** sends a query through the MCP Gateway — succeeds
-4. **Untrusted pod** (no AuthBridge, no SPIFFE sidecar) tries the same endpoint — rejected (no mTLS handshake / no valid token)
+4. **Untrusted pod** (no RossoCortex, no SPIFFE sidecar) tries the same endpoint — rejected (no mTLS handshake / no valid token)
 5. Show the sidecar's session API (`make show-result` / `abctl` TUI) — see the `jwt-validation allow` and `token-exchange modify` invocations
 
 ### Existing Assets
 
 | Asset | Location | Status |
 |-------|----------|--------|
-| SPIRE injection | `kagenti/scripts/kind/setup-kagenti.sh --with-spire` | Works |
-| mTLS demo | `kagenti-extensions/AuthBridge/demos/mtls/` | Works — `make demo-mtls` |
-| Token exchange demo | `kagenti-extensions/AuthBridge/demos/weather-agent/demo-ui-advanced.md` | Works |
+| SPIRE injection | `rossoctl/scripts/kind/setup-rossoctl.sh --with-spire` | Works |
+| mTLS demo | `rossoctl-extensions/RossoCortex/demos/mtls/` | Works — `make demo-mtls` |
+| Token exchange demo | `rossoctl-extensions/RossoCortex/demos/weather-agent/demo-ui-advanced.md` | Works |
 | Trusted/untrusted contrast | `spiffe-gateway-demo/scripts/demo-test.sh` (deleted) | Pattern exists in git history; needs resurrection |
 | Permission intersection (CTF) | `capture-the-flag/demos/leaked-access-token/` | Works — `make build && make load && ./scripts/setup.sh` |
 
@@ -164,8 +164,8 @@ Each backend gets:
 
 ### References
 
-- [AgentRuntime SPIFFE fields](https://github.com/kagenti/kagenti-operator/blob/main/kagenti-operator/api/v1alpha1/agentruntime_types.go#L99-L100)
-- [mTLS demo README](kagenti-extensions/AuthBridge/demos/mtls/README.md)
+- [AgentRuntime SPIFFE fields](https://github.com/rossoctl/rossoctl-operator/blob/main/rossoctl-operator/api/v1alpha1/agentruntime_types.go#L99-L100)
+- [mTLS demo README](rossoctl-extensions/RossoCortex/demos/mtls/README.md)
 - [CTF demo scripts](capture-the-flag/demos/leaked-access-token/)
 
 ---
@@ -212,7 +212,7 @@ UI ──► A2A JSON-RPC ──► Finance Agent pod
 3. Ask: *"What is AAPL's PE ratio?"*
 4. Show the response
 5. Open MLflow UI — show the trace: LLM reasoning, tool call, tool result, synthesis
-6. Show that the MLflow experiment is scoped per-agent: `kubectl get role kagenti-mlflow-finance-agent -n team1 -o yaml` — `resourceNames` contains only this agent's experiment (agent A can't see agent B's traces)
+6. Show that the MLflow experiment is scoped per-agent: `kubectl get role rossoctl-mlflow-finance-agent -n team1 -o yaml` — `resourceNames` contains only this agent's experiment (agent A can't see agent B's traces)
 
 ### Agent Options
 
@@ -221,21 +221,21 @@ Two implementations exist — pick one or reconcile:
 | Agent | Source | LLM | Pros | Cons |
 |-------|--------|-----|------|------|
 | Vincent's `financial_agent` | [caldeirav/agent-examples/a2a/financial_agent](https://github.com/caldeirav/agent-examples/tree/main/a2a/financial_agent) | LM Studio + Qwen3-30B-A3B | Richer agent (LangGraph, MLflow built-in, full README) | Requires LM Studio on host |
-| SPARC demo `finance-agent` | [kagenti-extensions/AuthBridge/demos/finance-sparc/finance-agent/](kagenti-extensions/AuthBridge/demos/finance-sparc/finance-agent/) | Ollama + llama3.2 | Already wired for AuthBridge + SPARC | Smaller model, simpler agent |
+| SPARC demo `finance-agent` | [rossoctl-extensions/RossoCortex/demos/finance-sparc/finance-agent/](rossoctl-extensions/RossoCortex/demos/finance-sparc/finance-agent/) | Ollama + llama3.2 | Already wired for RossoCortex + SPARC | Smaller model, simpler agent |
 
-**Recommendation:** Use Vincent's agent for Act 3 (richer, more impressive for a conference demo) and ensure it routes through AuthBridge. The SPARC demo agent is the right vehicle for Act 4a since it's already wired for the SPARC scenario.
+**Recommendation:** Use Vincent's agent for Act 3 (richer, more impressive for a conference demo) and ensure it routes through RossoCortex. The SPARC demo agent is the right vehicle for Act 4a since it's already wired for the SPARC scenario.
 
 ### Existing Assets
 
 - Vincent's financial agent: fully documented, tested, deployment instructions in README
-- SPARC demo agent: runs with `make demo` from `kagenti-extensions/AuthBridge/demos/finance-sparc/`
+- SPARC demo agent: runs with `make demo` from `rossoctl-extensions/RossoCortex/demos/finance-sparc/`
 - MLflow scoped observability: auto-configured by the operator when MLflow is installed
 
 ### What Needs Building
 
 - Point Vincent's agent at MCP Gateway instead of a direct `finance_tool` backend
 - Ensure sidecar injection works with Vincent's LangGraph agent (should be transparent — no code changes)
-- Test MLflow trace visibility through the Kagenti UI
+- Test MLflow trace visibility through the Rossoctl UI
 
 ---
 
@@ -275,7 +275,7 @@ make patch-config
 # Sidecar hot-reloads (~60s). No pod restart.
 ```
 
-The patch script ([`scripts/patch-sparc-config.sh`](kagenti-extensions/AuthBridge/demos/finance-sparc/scripts/patch-sparc-config.sh)) merges [`k8s/sparc-patch.yaml`](kagenti-extensions/AuthBridge/demos/finance-sparc/k8s/sparc-patch.yaml) into the ConfigMap and waits for the running sidecar to report a matching config SHA.
+The patch script ([`scripts/patch-sparc-config.sh`](rossoctl-extensions/RossoCortex/demos/finance-sparc/scripts/patch-sparc-config.sh)) merges [`k8s/sparc-patch.yaml`](rossoctl-extensions/RossoCortex/demos/finance-sparc/k8s/sparc-patch.yaml) into the ConfigMap and waits for the running sidecar to report a matching config SHA.
 
 #### With the grounding check — the catch
 
@@ -325,10 +325,10 @@ SPARC allow/grounded    tool=issue_refund  score=1.00   # Turn 2
 
 #### Existing asset
 
-This is the [`finance-sparc` demo](kagenti-extensions/AuthBridge/demos/finance-sparc/) — production-ready:
+This is the [`finance-sparc` demo](rossoctl-extensions/RossoCortex/demos/finance-sparc/) — production-ready:
 
 ```bash
-cd kagenti-extensions/AuthBridge/demos/finance-sparc
+cd rossoctl-extensions/RossoCortex/demos/finance-sparc
 make demo                   # watsonx reflection (needs WX_API_KEY)
 make demo PROVIDER=ollama   # local reflection (no creds)
 ```
@@ -441,16 +441,16 @@ These are complementary: grounding catches *how* the agent calls tools (with wha
 
 ### References
 
-- [SPARC plugin reference](kagenti-extensions/AuthBridge/docs/sparc-plugin.md)
-- [SPARC demo README](kagenti-extensions/AuthBridge/demos/finance-sparc/README.md)
-- [IBAC plugin source](https://github.com/kagenti/kagenti-extensions/blob/main/AuthBridge/authlib/plugins/ibac/plugin.go#L536-L549)
+- [SPARC plugin reference](rossoctl-extensions/RossoCortex/docs/sparc-plugin.md)
+- [SPARC demo README](rossoctl-extensions/RossoCortex/demos/finance-sparc/README.md)
+- [IBAC plugin source](https://github.com/rossoctl/rossoctl-extensions/blob/main/RossoCortex/authlib/plugins/ibac/plugin.go#L536-L549)
 - [Finance-IBAC demo](finance-ibac/) (in-repo, adapted from upstream IBAC demo)
 
 ---
 
 ## Architecture Diagram
 
-The reference implementation uses the Kagenti project, but the architecture is built from standard cloud-native components (SPIFFE, Envoy, OPA, Keycloak, Gateway API) that could be assembled independently.
+The reference implementation uses the Rossoctl project, but the architecture is built from standard cloud-native components (SPIFFE, Envoy, OPA, Keycloak, Gateway API) that could be assembled independently.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -528,18 +528,18 @@ The reference implementation uses the Kagenti project, but the architecture is b
 
 | Component | Location | How to Run |
 |-----------|----------|------------|
-| Platform on Kind (Kagenti) | `kagenti/scripts/kind/setup-kagenti.sh` | `./setup-kagenti.sh --with-spire --with-mcp-gateway --with-ui --with-mlflow` |
+| Platform on Kind (Rossoctl) | `rossoctl/scripts/kind/setup-rossoctl.sh` | `./setup-rossoctl.sh --with-spire --with-mcp-gateway --with-ui --with-mlflow` |
 | Finance MCP tool (market data) | [caldeirav/agent-examples: mcp/finance_tool](https://github.com/caldeirav/agent-examples/tree/main/mcp/finance_tool) | `uv run finance_tool.py` (port 8000) |
-| Finance MCP tool (transactions) | [kagenti-extensions: AuthBridge/demos/finance-sparc/finance-mcp/](kagenti-extensions/AuthBridge/demos/finance-sparc/finance-mcp/) | Go binary (port 8888) |
+| Finance MCP tool (transactions) | [rossoctl-extensions: RossoCortex/demos/finance-sparc/finance-mcp/](rossoctl-extensions/RossoCortex/demos/finance-sparc/finance-mcp/) | Go binary (port 8888) |
 | Financial agent (LangGraph) | [caldeirav/agent-examples: a2a/financial_agent](https://github.com/caldeirav/agent-examples/tree/main/a2a/financial_agent) | `uv run server` (port 8001) |
-| Financial agent (SPARC-wired) | [kagenti-extensions: AuthBridge/demos/finance-sparc/finance-agent/](kagenti-extensions/AuthBridge/demos/finance-sparc/finance-agent/) | Built + deployed by `make demo` |
-| SPARC demo (end-to-end) | [kagenti-extensions: AuthBridge/demos/finance-sparc/](kagenti-extensions/AuthBridge/demos/finance-sparc/) | `make demo` or `make demo PROVIDER=ollama` |
+| Financial agent (SPARC-wired) | [rossoctl-extensions: RossoCortex/demos/finance-sparc/finance-agent/](rossoctl-extensions/RossoCortex/demos/finance-sparc/finance-agent/) | Built + deployed by `make demo` |
+| SPARC demo (end-to-end) | [rossoctl-extensions: RossoCortex/demos/finance-sparc/](rossoctl-extensions/RossoCortex/demos/finance-sparc/) | `make demo` or `make demo PROVIDER=ollama` |
 | IBAC demo (finance-adapted) | [finance-ibac/](finance-ibac/) (in-repo) | `make demo-ibac` |
-| mTLS demo | [kagenti-extensions: AuthBridge/demos/mtls/](kagenti-extensions/AuthBridge/demos/mtls/) | `make demo-mtls` |
+| mTLS demo | [rossoctl-extensions: RossoCortex/demos/mtls/](rossoctl-extensions/RossoCortex/demos/mtls/) | `make demo-mtls` |
 | CTF / permission intersection | [capture-the-flag/demos/leaked-access-token/](capture-the-flag/demos/leaked-access-token/) | `make build && make load && ./scripts/setup.sh` |
-| MCP Gateway (upstream) | [Kuadrant/mcp-gateway](https://github.com/Kuadrant/mcp-gateway) v0.7.1 | Deployed via `setup-kagenti.sh --with-mcp-gateway` |
-| Kagenti UI | Part of platform install | `setup-kagenti.sh --with-ui` |
-| MLflow (scoped observability) | Part of platform install | `setup-kagenti.sh --with-mlflow` |
+| MCP Gateway (upstream) | [Kuadrant/mcp-gateway](https://github.com/Kuadrant/mcp-gateway) v0.7.1 | Deployed via `setup-rossoctl.sh --with-mcp-gateway` |
+| Rossoctl UI | Part of platform install | `setup-rossoctl.sh --with-ui` |
+| MLflow (scoped observability) | Part of platform install | `setup-rossoctl.sh --with-mlflow` |
 | Existing presentation deck | [presentation/slides.md](presentation/slides.md) | Marp slides, security-focused 3-act structure |
 
 ### Needs Building (Integration Work)
@@ -562,7 +562,7 @@ The reference implementation uses the Kagenti project, but the architecture is b
 | Vincent's GraphRAG project | Good "real-world motivation" | [caldeirav/agentic-graphrag-finance](https://github.com/caldeirav/agentic-graphrag-finance) — SEC filing analysis with knowledge graphs. Good example of a production agent that *needs* this infrastructure. |
 | A2A inter-agent communication | Aligned with abstract | MCP Gateway is [investigating A2A support](https://github.com/Kuadrant/mcp-gateway/issues/766) (LFX mentoring, Jun-Aug 2026). Could show agent-to-agent delegation via A2A if ready. |
 | OPA policy visualization | Good for live demo | Show OPA policy decisions in real time during the trusted/untrusted contrast test. |
-| Service mesh visualization (Kiali) | Good for live demo | `setup-kagenti.sh --with-kiali` — shows mTLS traffic flowing through the mesh. |
+| Service mesh visualization (Kiali) | Good for live demo | `setup-rossoctl.sh --with-kiali` — shows mTLS traffic flowing through the mesh. |
 
 ---
 
@@ -576,8 +576,8 @@ Vincent's fork adds:
 |-------------|------|-------------------|
 | Financial Agent | `a2a/financial_agent/` | Primary demo agent (Act 3). LangGraph, MLflow tracing, A2A server, LM Studio + Qwen3. |
 | Finance MCP Tool | `mcp/finance_tool/` | Market data backend (Act 1). FastMCP, yfinance, 4 tools. |
-| Environment configs | `sample-environments.yaml` | `mcp-finance` and `lmstudio` env sets for Kagenti deployment. |
-| Kagenti deployment docs | `a2a/financial_agent/README.md` | Full Kagenti-on-kind setup, import-via-UI instructions, troubleshooting. |
+| Environment configs | `sample-environments.yaml` | `mcp-finance` and `lmstudio` env sets for Rossoctl deployment. |
+| Rossoctl deployment docs | `a2a/financial_agent/README.md` | Full Rossoctl-on-kind setup, import-via-UI instructions, troubleshooting. |
 
 **Key architectural detail:** Vincent's agent uses `langchain-mcp-adapters` to connect to MCP. The `MCP_URL` env var points it at the MCP backend. Changing this to point at the MCP Gateway should be a config-only change.
 
@@ -597,11 +597,11 @@ A more ambitious research project — *"Graph-Grounded Agentic Retrieval over XB
 
 ## Cluster Setup
 
-The full demo stack deploys on a single Kind cluster. The Kagenti project provides a setup script that installs all the standard components:
+The full demo stack deploys on a single Kind cluster. The Rossoctl project provides a setup script that installs all the standard components:
 
 ```bash
-# From kagenti repo:
-scripts/kind/setup-kagenti.sh \
+# From rossoctl repo:
+scripts/kind/setup-rossoctl.sh \
   --with-spire \
   --with-mcp-gateway \
   --with-ui \
@@ -646,9 +646,9 @@ For a live presentation, the demo would flow as:
 
 ═══ Act 2: Identity ═══════════════════════════════════════
 
-  kubectl exec deploy/finance-agent -c authbridge-proxy \
+  kubectl exec deploy/finance-agent -c rossocortex-proxy \
     -- cat /shared/client-id.txt
-  → spiffe://kagenti/ns/team1/sa/finance-agent
+  → spiffe://rossoctl/ns/team1/sa/finance-agent
 
   "Automatic cryptographic identity. No code changes."
 
@@ -659,7 +659,7 @@ For a live presentation, the demo would flow as:
 
 ═══ Act 3: The Happy Path ════════════════════════════════
 
-  [Kagenti UI: "What is AAPL's PE ratio?"]
+  [Rossoctl UI: "What is AAPL's PE ratio?"]
   → Agent reasons, calls get_stock_fundamentals via gateway
   → Returns: PE ratio = 33.42
 
@@ -672,7 +672,7 @@ For a live presentation, the demo would flow as:
 
   ── GUARDRAILS OFF ──
 
-  [Kagenti UI: "Refund my duplicate $450 subscription charge"]
+  [Rossoctl UI: "Refund my duplicate $450 subscription charge"]
   → Agent calls issue_refund(transaction_id="$450")   ← fabricated
   → Tool executes/errors — the hallucinated value reached the API
 
@@ -689,11 +689,11 @@ For a live presentation, the demo would flow as:
 
   ── GUARDRAILS ON ──
 
-  [Kagenti UI: same question — "Refund my duplicate $450 charge"]
+  [Rossoctl UI: same question — "Refund my duplicate $450 charge"]
   → Agent calls issue_refund("$450") → SPARC rejects (score 0.00)
   → Agent: "Could you provide the exact transaction ID?"
 
-  [Kagenti UI: "The transaction id is TX4827"]
+  [Rossoctl UI: "The transaction id is TX4827"]
   → Agent calls issue_refund("TX4827") → SPARC approves (score 1.00)
   → "Transaction TX4827 has been successfully refunded."
 
@@ -704,7 +704,7 @@ For a live presentation, the demo would flow as:
 
   ── GUARDRAILS OFF ──
 
-  [Kagenti UI: "What's the latest news about AAPL?"]
+  [Rossoctl UI: "What's the latest news about AAPL?"]
   → Agent calls get_news(ticker="AAPL") via MCP → news-server
   → Poisoned article instructs agent to POST portfolio data
   → POST to tainted-server:9999 succeeds
@@ -723,7 +723,7 @@ For a live presentation, the demo would flow as:
 
   ── GUARDRAILS ON ──
 
-  [Kagenti UI: "What's the latest news about AAPL?"]
+  [Rossoctl UI: "What's the latest news about AAPL?"]
   → Agent attempts same exfiltration
   → IBAC: "deny — POSTing to unknown server is not aligned
     with asking about financial news" → 403
@@ -774,10 +774,10 @@ For a live presentation, the demo would flow as:
 | This document | `presentation/kubecon-japan-demo-playbook.md` |
 | Existing slides | `presentation/slides.md` |
 | Executive summary | `presentation/executive-summary.md` |
-| Kagenti setup | `kagenti/scripts/kind/setup-kagenti.sh` |
-| SPARC demo | `kagenti-extensions/AuthBridge/demos/finance-sparc/` |
+| Rossoctl setup | `rossoctl/scripts/kind/setup-rossoctl.sh` |
+| SPARC demo | `rossoctl-extensions/RossoCortex/demos/finance-sparc/` |
 | Finance-IBAC demo | `finance-ibac/` |
-| mTLS demo | `kagenti-extensions/AuthBridge/demos/mtls/` |
+| mTLS demo | `rossoctl-extensions/RossoCortex/demos/mtls/` |
 | CTF demo | `capture-the-flag/demos/leaked-access-token/` |
 | Vincent's agent | [github.com/caldeirav/agent-examples/a2a/financial_agent](https://github.com/caldeirav/agent-examples/tree/main/a2a/financial_agent) |
 | Finance tool (vendored) | `finance-tool/` |
