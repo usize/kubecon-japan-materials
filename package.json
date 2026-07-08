@@ -1,0 +1,14 @@
+{
+  "name": "kubecon-japan-slides",
+  "private": true,
+  "scripts": {
+    "preview": "marp --preview slides.md",
+    "serve": "marp --server --watch .",
+    "build:html": "marp slides.md -o slides.html",
+    "build:pdf": "marp slides.md -o slides.pdf",
+    "build:pptx": "marp slides.md -o slides.pptx"
+  },
+  "devDependencies": {
+    "@marp-team/marp-cli": "^4"
+  }
+}

@@ -45,6 +45,27 @@ End-to-end demo showing four infrastructure patterns for running agentic AI on K
 ./scripts/teardown.sh --destroy-cluster # Also delete the Kind cluster
 ```
 
+## Slide deck
+
+The talk slides are in `slides.md` (Marp format).
+
+```bash
+npm install
+
+# Live preview with hot-reload
+npm run serve
+
+# Open in default browser
+npm run preview
+
+# Export
+npm run build:html   # slides.html
+npm run build:pdf    # slides.pdf (requires Chrome/Chromium)
+npm run build:pptx   # slides.pptx
+```
+
+Speaker notes are embedded as HTML comments (`<!-- ... -->`) in each slide.
+
 ## How it works
 
 Each script uses `set -eux` for full command visibility and pauses at key moments for the presenter to narrate. The master `demo.sh` chains all stages with inter-stage pauses.
