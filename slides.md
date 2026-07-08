@@ -136,9 +136,7 @@ style: |
     background: #0e0e0e;
   }
   section.demo h1 {
-    color: #d4a843;
-    font-size: 32px;
-    font-weight: 400;
+    display: none;
   }
   section.demo em {
     color: #e8584f;
@@ -159,6 +157,12 @@ style: |
   section.demo blockquote p {
     color: #ddd;
   }
+  .demo-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 12px;
+  }
   .demo-label {
     display: inline-block;
     background: #c0272d;
@@ -170,7 +174,15 @@ style: |
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 2px;
-    margin-bottom: 8px;
+    flex-shrink: 0;
+  }
+  .demo-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #fff;
   }
 ---
 
@@ -336,40 +348,45 @@ This is the key design point. Because the sidecar understands the protocols — 
 
 <!-- _class: demo -->
 
-<span class="demo-label">Demo</span>
+<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">MCP Gateway</span></div>
 
-# The Platform + Identity
-
-note: this slide will become a video
-
-- Pre-deployed cluster with *3 backends*, *10 tools* behind one MCP Gateway endpoint
-- Deploy agent from Rossoctl UI: namespace, image, RossoCortex sidecar, SPIRE identity
-- Agent starts as **2/2** (agent + sidecar)
-- Show *SPIFFE ID* via `kubectl exec`
-- Untrusted pod (no sidecar, no SPIFFE) tries to call the agent → **401 rejected**
-- Show *token exchange config*: outbound calls to `mcp-gateway*` get automatic credential injection
+<video controls src="videos/01-mcp-gateway.mp4" muted width="100%"></video>
 
 <!--
-Three things just happened with zero code changes. The agent got a cryptographic identity from SPIRE. It got authenticated access to the MCP Gateway via automatic token exchange. And an untrusted workload without identity was rejected at the door.
+This is the MCP Gateway — a CNCF project from Kuadrant. It federates multiple tool backends behind a single endpoint. Three backends registered: market data, transactions, and news. The agent connects to one URL and discovers all 10 tools automatically.
 -->
 
 ---
 
 <!-- _class: demo -->
 
-<span class="demo-label">Demo</span>
+<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">Deploying an Agent</span></div>
 
-# The Happy Path
+<video controls src="videos/02-deploy-agent-spiffe.mp4" muted width="100%"></video>
 
-note: this slide will become a video
+<!--
+Deploy from the UI: set namespace, image, enable the RossoCortex sidecar and SPIRE identity, configure the token exchange route. The agent starts as 2/2 — agent plus sidecar. Show the SPIFFE ID via kubectl exec — a cryptographic identity issued automatically at pod birth.
+-->
 
-**User asks:** "What's the latest news about AAPL?"
+---
 
-- Agent calls `get_news` via MCP Gateway → returns news articles
-- Sidecar logs show:
-  - `jwt-validation` → *allow* on inbound
-  - `token-exchange` → *modify* on outbound
-- Full stack working: identity → gateway routing → tool execution → response
+<!-- _class: demo -->
+
+<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">Zero-Trust Rejection</span></div>
+
+<video controls src="videos/03-untrusted-pod-rejected.mp4" muted width="100%"></video>
+
+<!--
+An untrusted pod — no sidecar, no SPIFFE identity — tries to call the agent. Rejected with 401: missing Authorization header. If you don't have cryptographic identity, you don't get in.
+-->
+
+---
+
+<!-- _class: demo -->
+
+<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">The Happy Path</span></div>
+
+<video controls src="videos/04-happy-path.mp4" muted width="100%"></video>
 
 <!--
 The full stack working end-to-end. A2A request in, JWT validated, LLM reasons, MCP tool call out through the gateway, token injected automatically. Now let's see what can go wrong.
@@ -424,11 +441,9 @@ We know guardrails are important — but each guardrail solves a unique problem 
 
 <!-- _class: demo -->
 
-<span class="demo-label">Demo — SPARC guardrails off</span>
+<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">SPARC off — Hallucinated Arguments</span></div>
 
-note: replace with video
-
-# Hallucinated Arguments — Unprotected
+*Video TBD*
 
 **User asks:** "Refund my duplicate $450 subscription charge from last week."
 
@@ -447,11 +462,9 @@ The agent invented a transaction ID. No tool call verified it. In production, th
 
 <!-- _class: demo -->
 
-<span class="demo-label">Demo — SPARC guardrails on</span>
+<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">SPARC on — Hallucinated Arguments</span></div>
 
-note: replace with video
-
-# Hallucinated Arguments — Protected
+*Video TBD*
 
 - Apply SPARC pipeline patch live (`make patch-config`) — *no pod restart*
 - Replay: "Refund my $450 charge."
@@ -472,34 +485,21 @@ Same agent, same question. The sidecar parsed the MCP tool call, saw the argumen
 
 <!-- _class: demo -->
 
-<span class="demo-label">Demo — IBAC guardrails off</span>
+<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">IBAC off — Prompt Injection</span></div>
 
-note: replace with video
-
-# Prompt Injection — Unprotected
-
-**User asks:** "What's the latest news about AAPL?"
-
-- Agent calls `get_news` via MCP Gateway — returns 5 articles
-- One article contains a **fake "compliance notice"** instructing the agent to POST portfolio data to an external server
-- Agent follows the injected instruction
-- Tainted-server logs: **"EXFILTRATED PORTFOLIO DATA"** with financial details
-
-> Every security layer passed. Identity — valid. Token — valid. The attack worked because nothing checked whether the agent's actions matched what the user asked for.
+<video controls src="videos/05-ibac-incident-and-patch.mp4" muted width="100%"></video>
 
 <!--
-Every security layer passed. Identity — valid. Token — valid. The attack worked because nothing checked whether the agent's actions matched what the user actually asked for.
+Every security layer passed. Identity — valid. Token — valid. The attack worked because nothing checked whether the agent's actions matched what the user actually asked for. This video covers the full IBAC flow: incident discovery, analysis, patching the guardrail live, and replaying the attack.
 -->
 
 ---
 
 <!-- _class: demo -->
 
-<span class="demo-label">Demo — IBAC guardrails on</span>
+<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">IBAC on — Prompt Injection</span></div>
 
-note: replace with video
-
-# Prompt Injection — Protected
+*Continues from previous video*
 
 - Apply IBAC pipeline patch live — *no pod restart*
 - Replay: "What's the latest news about AAPL?"
@@ -550,12 +550,12 @@ Four layers of defense. A protocol-aware gateway for tool access. Cryptographic 
 <br>
 
 **Rossoctl** — rossoctl.dev
-**RossoCortex + SPARC + IBAC** — github.com/rossoctl/rossoctl-extensions
-**MCP Gateway** — CNCF project from Kuadrant
+**RossoCortex + SPARC + IBAC** - github.com/rossoctl/rossoctl-extensions
+**MCP Gateway** - CNCF project from Kuadrant
 
 <br>
 
-Everything runs on a Kind cluster — try it today.
+Everything runs in your K8s cluster - try it today.
 
 <br>
 
