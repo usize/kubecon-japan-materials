@@ -17,8 +17,17 @@ PLATFORM_NS="${PLATFORM_NS:-kagenti-system}"
 MCP_GATEWAY_URL="http://mcp-gateway-istio.gateway-system.svc.cluster.local:8080/mcp"
 
 # Paths to dependencies (cloned into thirdparty/)
+KAGENTI_REPO="${KAGENTI_REPO:-git@github.com:usize/kagenti.git}"
+KAGENTI_BRANCH="${KAGENTI_BRANCH:-fix/mlflow-scorer-job-runner}"
 KAGENTI_ROOT="$DEMO_DIR/thirdparty/kagenti"
 EXTENSIONS_ROOT="$DEMO_DIR/thirdparty/kagenti-extensions"
+
+# Auto-clone kagenti if missing
+if [ ! -d "$KAGENTI_ROOT" ]; then
+  echo "Cloning kagenti from $KAGENTI_REPO (branch: $KAGENTI_BRANCH)..."
+  mkdir -p "$DEMO_DIR/thirdparty"
+  git clone --branch "$KAGENTI_BRANCH" --single-branch "$KAGENTI_REPO" "$KAGENTI_ROOT"
+fi
 SPARC_DEMO_DIR="$EXTENSIONS_ROOT/AuthBridge/demos/finance-sparc"
 IBAC_DEMO_DIR="$DEMO_DIR/finance-ibac"
 SETUP_SCRIPT="$KAGENTI_ROOT/scripts/kind/setup-kagenti.sh"

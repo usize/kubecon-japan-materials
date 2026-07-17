@@ -59,6 +59,14 @@ spec:
               value: "http://ibac-news-server.team1.svc.cluster.local:8888"
             - name: AGENT_PUBLIC_URL
               value: "http://finance-news-agent.team1.svc.cluster.local:8080/"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.kagenti-system.svc.cluster.local:8335"
+            - name: OTEL_SERVICE_NAME
+              value: "finance-news-agent"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.namespace=team1,mlflow.experimentName=team1"
+            - name: MLFLOW_EXPERIMENT_NAME
+              value: "team1"
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

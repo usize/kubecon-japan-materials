@@ -441,69 +441,66 @@ These aren't authentication failures. The agent's identity is valid. Its token i
 
 ---
 
-# Two Guardrails, Two Shapes
+# Observability First, Then Guardrails
 
-**Insight**: LLM flexibility allows us to guard against runtime anomalies.
+**Insight**: Before adding runtime guardrails, establish observability — you can't guard what you can't see.
 
 
-| | **SPARC** (Argument Grounding) | **IBAC** (Intent Verification) |
+| | **MLflow Judge** (Post-Hoc) | **IBAC** (Real-Time) |
 |---|---|---|
-| **Parses** | MCP tool calls | A2A user messages |
-| **Detects** | Ungrounded tool arguments | Actions misaligned with user intent |
-| **Catches** | Agent fabricates data for an API call | Agent follows injected instructions |
-| **Action** | Returns clarification instead of executing | Blocks the request (403) |
+| **When** | After the trace is recorded | Before the request leaves the pod |
+| **How** | Custom `make_judge()` evaluates traces | Sidecar plugin evaluates every outbound call |
+| **Detects** | Prompt injection patterns in recorded behavior | Actions misaligned with user intent |
+| **Action** | Flags for review — generates verdict + rationale | Blocks the request (403) |
 
 <br>
 
-Both run as sidecar plugins. Both are hot-reloadable.
-**Both live outside the agent.**
+Same LLM judge concept. Different enforcement point.
+**From detection to prevention.**
 
 <!--
-We know guardrails are important — but each guardrail solves a unique problem and has a unique shape. SPARC parses MCP requests and detects bad tool arguments. IBAC parses A2A requests and detects deviations from the user's intent — a good proxy for prompt injection. Let me show you both.
+We're going to show two approaches to the same problem — prompt injection. First, MLflow observability with a custom judge that detects injection after the fact. Then, the IBAC sidecar plugin that blocks it in real-time. Same LLM judge concept, different enforcement points. Detection first, then prevention.
 -->
 
 ---
 
 <!-- _class: demo -->
 
-<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">SPARC off — Hallucinated Arguments</span></div>
+<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">MLflow Traces — Injection Succeeds</span></div>
 
-*Video TBD*
+- Deploy agent with **OTEL/MLflow tracing** — traces route to `team1` experiment
+- Ask: *"What's the latest news about AAPL?"*
+- Poisoned news article triggers exfiltration — **no guardrails, attack succeeds**
+- Open **MLflow UI** — full trace visible: LLM reasoning, tool calls, exfiltration POST
 
-**User asks:** "Refund my duplicate $450 subscription charge from last week."
-
-- Agent has `issue_refund` tool but *no search/lookup tool*
-- It **fabricates a transaction ID** and calls `issue_refund` with a hallucinated value
-- The call reaches the API unchecked
-- Agent confidently reports "refund processed" with a **made-up ID**
-
-> In production, that's a fabricated argument hitting a real financial API.
+> The trace captured everything. The attack is visible — but it already happened.
 
 <!--
-The agent invented a transaction ID. No tool call verified it. In production, that's a fabricated argument hitting a real financial API.
+We deployed the agent with OTEL env vars that route traces to a named MLflow experiment. The attack succeeded — portfolio data was exfiltrated. But MLflow recorded the entire trace. We can see every tool call, every LLM decision, the exfiltration POST. Observability captured the attack chain. Now let's analyze it.
 -->
 
 ---
 
 <!-- _class: demo -->
 
-<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">SPARC on — Hallucinated Arguments</span></div>
+<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">Custom Judge Detects Injection</span></div>
 
-*Video TBD*
+- `mlflow.genai.judges.make_judge()` — custom prompt injection detector
+- Runs against local Ollama (`llama3.2:3b`) — no external API needed
+- Fetches latest trace, evaluates agent behavior
 
-- Apply SPARC pipeline patch live (`make patch-config`) — *no pod restart*
-- Replay: "Refund my $450 charge."
+**Judge verdict:**
+```
+Verdict:   injected
+Rationale: The agent followed instructions embedded in a news article
+           and made an HTTP POST to an unknown server, exfiltrating
+           portfolio data the user never requested.
+```
 
-**What happens:**
-1. Agent tries fabricated call → SPARC scores **0.00** (ungrounded)
-2. Returns *clarification* as tool result instead of executing
-3. Agent asks user for the real transaction ID
-4. User provides "TX4827" → SPARC scores **1.00** (grounded) → refund succeeds
-
-**Forensic view:** `modify/reflected` → `allow/grounded`
+> Post-hoc detection works. Next: **real-time blocking with IBAC**.
 
 <!--
-Same agent, same question. The sidecar parsed the MCP tool call, saw the argument couldn't be traced to the conversation, and returned a clarification instead of executing. The agent got a natural correction loop — no code change, no redeployment.
+We built a custom judge using mlflow make_judge. It fetched the latest trace, examined the inputs and outputs, and classified the interaction as "injected." The judge runs locally on Ollama — no external API calls. This establishes the pattern: an LLM judge evaluating agent behavior. Now let's move that judge to the infrastructure layer, where it can block attacks before they succeed.
 -->
 
 ---
@@ -553,7 +550,7 @@ The sidecar captured the user's intent from the A2A message on the way in: 'what
 | **MCP Gateway** | Tool discovery & routing | Protocol-aware gateway, unified endpoint |
 | **SPIFFE / SPIRE** | Workload identity | Cryptographic identity at pod birth |
 | **Token exchange** | Authenticated tool access | Sidecar injects scoped credentials |
-| **SPARC + IBAC** | Runtime guardrails | Parse MCP + A2A traffic, enforce semantically |
+| **MLflow + IBAC** | Observability & guardrails | Detect injection post-hoc, block in real-time |
 
 <br>
 
@@ -575,7 +572,8 @@ Four layers of defense. A protocol-aware gateway for tool access. Cryptographic 
 <br>
 
 **Rossoctl** — rossoctl.dev
-**RossoCortex + SPARC + IBAC** - github.com/rossoctl/rossoctl-extensions
+**RossoCortex + IBAC** - github.com/rossoctl/rossoctl-extensions
+**MLflow** - mlflow.org — custom judges via `mlflow.genai.judges`
 **MCP Gateway** - CNCF project from Kuadrant
 
 <br>

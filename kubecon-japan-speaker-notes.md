@@ -475,25 +475,27 @@ kubectl -n team1 logs deploy/finance-news-agent -c rossocortex-proxy --tail=30 \
 > authorized access to downstream services. The agent connects to one URL
 > and discovers everything.
 >
-> **Guardrails:** When the agent's own behavior becomes the threat — prompt
-> injection, hallucinated arguments — the sidecar catches it at the
-> infrastructure layer. Hot-reloadable, per-workload, no agent code changes.
-> The agent never knows the guardrail exists.
+> **Observability:** MLflow captures every agent trace — LLM reasoning,
+> tool calls, outbound requests. A custom judge using mlflow make_judge
+> evaluates traces post-hoc and detects prompt injection patterns.
+> You can't guard what you can't see.
 >
-> These are three infrastructure concerns handled at the infrastructure
+> **Guardrails:** When the agent's own behavior becomes the threat —
+> prompt injection, exfiltration — the IBAC sidecar plugin catches it
+> in real-time. Same LLM judge concept as the MLflow judge, but enforced
+> at the infrastructure layer before the request leaves the pod.
+> Hot-reloadable, per-workload, no agent code changes.
+>
+> These are infrastructure concerns handled at the infrastructure
 > layer. The agent was never modified. Any framework, any language, any
 > LLM. You deploy your agent, the platform secures it.
 >
 > **Call to action:**
 > Everything you saw is open source. Rossoctl is at rossoctl.dev. The
-> RossoCortex guardrails — including SPARC for catching hallucinated tool
-> arguments — are in the rossoctl-extensions repo. The MCP Gateway is a
-> CNCF project from Kuadrant.
->
-> We also have a SPARC demo that shows how the same sidecar architecture
-> catches hallucinated tool arguments — an agent that fabricates a
-> transaction ID gets a reflection-based correction loop, no code changes.
-> Check it out in the rossoctl-extensions repo.
+> RossoCortex guardrails — including IBAC for real-time intent
+> verification — are in the rossoctl-extensions repo. The MCP Gateway
+> is a CNCF project from Kuadrant. MLflow custom judges are available
+> via mlflow.genai.judges.
 >
 > Try it on a Kind cluster. Break it. Tell us what's missing. Thank you.
 

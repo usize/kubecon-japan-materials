@@ -63,9 +63,9 @@ if [[ "$START_FROM" -le 3 ]]; then
   pause "Ready for Stage 4a"
 fi
 
-# ── Stage 4a: SPARC ───────────────────────────────────────────────────────
+# ── Stage 4a: MLflow Judge ────────────────────────────────────────────────
 if [[ "$START_FROM" -le 4 ]]; then
-  bash "$SCRIPT_DIR/4a-sparc.sh"
+  bash "$SCRIPT_DIR/4a-mlflow-judge.sh"
   pause "Ready for Stage 4b"
 fi
 
