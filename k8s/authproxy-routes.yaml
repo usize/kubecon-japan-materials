@@ -1,0 +1,22 @@
+# Outbound token-exchange routes for workloads in team1.
+#
+# The AuthBridge sidecar's token-exchange plugin matches the request's
+# Host header against this list; on a hit it performs an RFC 8693 token
+# exchange against Keycloak (audience=target_audience) and swaps the
+# Authorization header before the request leaves the pod.
+#
+# Host patterns are matched with the port stripped. All other hosts fall
+# back to the plugin's default_policy (passthrough), so LLM calls and
+# telemetry are unaffected.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authproxy-routes
+  namespace: team1
+  labels:
+    app.kubernetes.io/part-of: fintech-demo
+data:
+  routes.yaml: |
+    - host: "mcp-gateway-istio.gateway-system.svc.cluster.local"
+      target_audience: "mcp-gateway"
+      token_scopes: "openid"

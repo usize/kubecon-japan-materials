@@ -31,3 +31,33 @@ echo "  ────────────────────────
 echo "  Username:     ${KC_USER}"
 echo "  Password:     ${KC_PASS}"
 echo ""
+
+# MCP Gateway token (for MCP Inspector Authorization tab)
+KC_URL="http://keycloak.localtest.me:${PORT}"
+ADMIN_TOKEN=$(curl -s -X POST "${KC_URL}/realms/master/protocol/openid-connect/token" \
+  -d "grant_type=password&client_id=admin-cli&username=${KC_USER}&password=${KC_PASS}" \
+  2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)
+
+if [ -n "$ADMIN_TOKEN" ]; then
+  # Get mcp-gateway client secret
+  MCP_CLIENT_UUID=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+    "${KC_URL}/admin/realms/kagenti/clients?clientId=mcp-gateway" \
+    2>/dev/null | python3 -c "import sys,json; c=json.load(sys.stdin); print(c[0]['id'] if c else '')" 2>/dev/null)
+
+  if [ -n "$MCP_CLIENT_UUID" ]; then
+    MCP_SECRET=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+      "${KC_URL}/admin/realms/kagenti/clients/$MCP_CLIENT_UUID/client-secret" \
+      2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('value',''))" 2>/dev/null)
+
+    MCP_TOKEN=$(curl -s -X POST "${KC_URL}/realms/kagenti/protocol/openid-connect/token" \
+      -d "grant_type=client_credentials&client_id=mcp-gateway&client_secret=${MCP_SECRET}&scope=openid" \
+      2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)
+
+    if [ -n "$MCP_TOKEN" ]; then
+      echo "  MCP Gateway token (for MCP Inspector)"
+      echo "  ──────────────────────────────────────────"
+      echo "  Bearer $MCP_TOKEN"
+      echo ""
+    fi
+  fi
+fi

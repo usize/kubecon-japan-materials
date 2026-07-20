@@ -1,0 +1,41 @@
+# JWT enforcement at the MCP Gateway.
+#
+# Every request to the gateway must carry a valid Keycloak-issued token.
+# The agent's AuthBridge sidecar obtains that token via RFC 8693 token
+# exchange (see k8s/authproxy-routes.yaml) — a naked caller gets 403,
+# the agent gets through. This is what makes "token exchange working"
+# visible in the demo.
+#
+# Note: an ALLOW policy on the gateway means requests WITHOUT a valid
+# request principal are denied by default — no separate DENY needed.
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: mcp-gateway-jwt
+  namespace: gateway-system
+  labels:
+    app.kubernetes.io/part-of: fintech-demo
+spec:
+  selector:
+    matchLabels:
+      gateway.networking.k8s.io/gateway-name: mcp-gateway
+  jwtRules:
+    - issuer: "http://keycloak.localtest.me:8080/realms/kagenti"
+      jwksUri: "http://keycloak-service.keycloak.svc:8080/realms/kagenti/protocol/openid-connect/certs"
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: mcp-gateway-require-jwt
+  namespace: gateway-system
+  labels:
+    app.kubernetes.io/part-of: fintech-demo
+spec:
+  selector:
+    matchLabels:
+      gateway.networking.k8s.io/gateway-name: mcp-gateway
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            requestPrincipals: ["*"]
