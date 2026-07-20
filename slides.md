@@ -4,7 +4,7 @@ theme: default
 paginate: true
 style: |
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
-  /* Rossoctl — dark theme: red, black, gold, warm white */
+  /* Dark theme: red, black, gold, warm white */
   :root {
     --bg: #0e0e0e;
     --bg-surface: #161616;
@@ -209,6 +209,14 @@ style: |
     letter-spacing: 2px;
     color: var(--text-mid);
   }
+  .part-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: var(--gold-dim);
+    margin-bottom: 4px;
+  }
 ---
 
 <!-- _class: lead -->
@@ -225,47 +233,65 @@ style: |
 KubeCon Japan 2026
 
 <!--
-Welcome. Today we're going to talk about securing agentic AI workloads — not at the application layer, but at the infrastructure layer. Using Kubernetes, CNCF projects, and open standards. With live demos. No agent code was harmed in the making of this talk.
+Welcome. Today we're going to talk about securing agentic AI workloads — not at the application layer, but at the infrastructure layer. Using Kubernetes, CNCF projects, and open standards.
 -->
 
 ---
 
-# "Agents are workloads. But they break our assumptions."
+# Agentic Systems Have Novel Properties
 
 - **Traditional workloads:** request in, response out, deterministic
 - **Agents:** reason, discover tools, take autonomous actions
 
-Running agentic workloads in production introduces new infrastructure challenges:
+We can account for some of these properties using **zero-trust principles.**
 
-| Challenge | Question |
-|-----------|----------|
-| **Tool discovery & access** | How does the agent find and call tools securely? |
-| **Workload identity** | Who is this agent, and what is it allowed to do? |
-| **Inter-agent communication** | How do agents talk to each other safely? |
-| **Runtime guardrails** | The agent is authorized — but is it doing the right thing? |
+But a truly AI-native posture means *stepping beyond them.*
+
+<br>
+
+| Zero Trust Handles | Zero Trust Does Not Handle |
+|---|---|
+| Who is this workload? | Is the workload doing the right thing? |
+| Is it authorized to call this service? | Are its actions aligned with the user's intent? |
+| Is the channel encrypted? | Is its behavior being influenced by its inputs? |
 
 <!--
-Every platform team running agents in production hits these questions. Today we'll show how to solve them at the infrastructure layer — using Kubernetes, CNCF projects, and open standards. No agent code changes.
+Agents are fundamentally different from traditional workloads. They reason, they discover tools, they take autonomous actions. Zero trust gives us identity and access control — but it doesn't tell us whether the agent is behaving correctly. Today we'll show both sides: establishing the zero-trust baseline, then going beyond it.
 -->
 
 ---
 
-# Reference Architecture at a Glance 
+<!-- _class: lead -->
+
+<div class="part-label">Part One</div>
+
+# Establishing a Secure Baseline
+
+Identity, tool access, and authorization
+
+<!--
+Let's start with the foundations. Every agent needs identity. Every tool call needs authentication. We'll deploy an agent with cryptographic workload identity and show that unauthenticated access is rejected.
+-->
+
+---
+
+# Reference Architecture
 
 <div class="columns">
 <div>
 
-**Platform Namespace** - Identity provider(s), Agent lifecycle management and inference.
+**Platform Layer** — Identity, observability, inference
 ```
 +----------------------------+
-|  Rossoctl Operator         |
+|  Kagenti Operator          |
 |  SPIRE Server              |
 |  Keycloak                  |
+|  MLflow + OTEL Collector   |
 |  Ollama                    |
 +----------------------------+
 ```
 
-**MCP Gateway** - three finance relevant tool servers behind a single control plane.
+**MCP Gateway** — Tool servers behind a single endpoint
 ```
 +----------------------------+
 |  market-data  (finance)    |
@@ -277,12 +303,12 @@ Every platform team running agents in production hits these questions. Today we'
 </div>
 <div>
 
-**Agent Namespace** - Agents deployed here are managed and added to our trust domain.
+**Agent Pod** — Managed by the platform, part of the trust domain
 ```
 +--------------------------------+
 |  Finance Agent Pod             |
 |  +--------+ +--------------+  |
-|  |        | | RossoCortex  |  |
+|  |        | | AuthBridge   |  |
 |  |        | |   sidecar    |  |
 |  |        | | +---------+  |  |
 |  | Agent  | | |inbound  |  |  |
@@ -294,13 +320,13 @@ Every platform team running agents in production hits these questions. Today we'
 |  +--------+ +--------------+  |
 |  SPIFFE Identity               |
 +--------------------------------+
- ```
+```
 
 </div>
 </div>
 
 <!--
-The agent is a regular pod. The operator injects a sidecar — RossoCortex — that handles identity, token exchange, and guardrails. The MCP Gateway aggregates tool backends behind a single endpoint. Communication uses two open protocols: A2A for agent-to-agent messaging, MCP for tool access. The platform also supports building agents from git via Tekton — develop, deploy, and secure from one cluster.
+The agent is a regular Kubernetes pod. The operator injects a sidecar — AuthBridge — that handles identity, token exchange, and guardrails. The MCP Gateway aggregates tool backends behind a single endpoint. No agent code changes.
 -->
 
 ---
@@ -327,8 +353,9 @@ X.509 SVID — auto-rotated — bound to service account
 <div>
 
 ### Outbound (Token Exchange)
-- SPIFFE credential becomes scoped JWT 
-- Injected per-backend automatically == auth without token management 
+- SPIFFE credential becomes scoped JWT
+- Injected per-backend automatically
+- Auth without token management
 
 </div>
 </div>
@@ -338,252 +365,245 @@ X.509 SVID — auto-rotated — bound to service account
 **No API keys. No shared secrets. All auth policy is configuration, not code.**
 
 <!--
-SPIFFE gives the agent a cryptographic identity. The sidecar uses it for mTLS and token exchange. The agent binary never touches a credential. And if a workload doesn't have identity, it doesn't get in — we'll show that in a moment.
--->
-
----
-
-# Our Networking Layer Understands A2A and MCP
-
-```
-Inbound (A2A):                  Outbound (MCP / HTTP):
-
-+----------------+              +------------------+
-| a2a-parser     | -> captures  | token-exchange   | -> injects auth
-|                |    intent    |                  |
-+----------------+              +------------------+
-| jwt-validation | -> authN     | inference-parser | -> captures LLM
-|                |              |                  |    reasoning
-+----------------+              +------------------+
-                                | mcp-parser       | -> captures tool
-                                |                  |    calls
-                                +------------------+
-                                | guardrail plugin | -> evaluates
-                                +------------------+
-```
-
-- Not just an API Gateway -- it **parses A2A and MCP protocol traffic**
-- This means guardrail plugins have *full semantic context*
-
-<!--
-This is the key design point. Because the sidecar understands the protocols — A2A for inter-agent communication, MCP for tool calls — it can make semantic decisions, not just network-level ones. It knows what the user asked for and what the agent is trying to do. And the pipeline is composable — you add or remove guardrails with a config change.
+SPIFFE gives the agent a cryptographic identity. The sidecar uses it for mTLS and token exchange. The agent binary never touches a credential.
 -->
 
 ---
 
 <!-- _class: demo -->
 
-<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">MCP Gateway</span></div>
+<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">MCP Gateway — Tool Aggregation</span></div>
 
 <video controls src="videos/01-mcp-gateway.mp4" muted width="100%"></video>
 
 <!--
-This is the MCP Gateway — a CNCF project from Kuadrant. It federates multiple tool backends behind a single endpoint. Three backends registered: market data, transactions, and news. The agent connects to one URL and discovers all 10 tools automatically.
+The MCP Gateway — a CNCF project from Kuadrant. Three tool servers registered: market data, transactions, and news. The agent connects to one URL and discovers all tools automatically. One endpoint, multiple backends.
 -->
 
 ---
 
 <!-- _class: demo -->
 
-<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">Deploying an Agent</span></div>
+<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">Deploying an Agent with SPIFFE Identity</span></div>
 
 <video controls src="videos/02-deploy-agent-spiffe.mp4" muted width="100%"></video>
 
 <!--
-Deploy from the UI: set namespace, image, enable the RossoCortex sidecar and SPIRE identity, configure the token exchange route. The agent starts as 2/2 — agent plus sidecar. Show the SPIFFE ID via kubectl exec — a cryptographic identity issued automatically at pod birth.
+Deploy from the UI: set namespace, image, enable AuthBridge sidecar and SPIRE identity, configure the token exchange routes. The agent starts as 2/2 — agent plus sidecar. Cryptographic identity issued automatically at pod birth.
 -->
 
 ---
 
 <!-- _class: demo -->
 
-<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">Zero-Trust Rejection</span></div>
+<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">Untrusted Pod — Rejected</span></div>
 
 <video controls src="videos/03-untrusted-pod-rejected.mp4" muted width="100%"></video>
 
 <!--
-An untrusted pod — no sidecar, no SPIFFE identity — tries to call the agent. Rejected with 401: missing Authorization header. If you don't have cryptographic identity, you don't get in.
--->
-
----
-
-<!-- _class: demo -->
-
-<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">The Happy Path</span></div>
-
-<video controls src="videos/04-happy-path.mp4" muted width="100%"></video>
-
-<!--
-The full stack working end-to-end. A2A request in, JWT validated, LLM reasons, MCP tool call out through the gateway, token injected automatically. Now let's see what can go wrong.
--->
-
----
-
-# The Agent Is Authorized. But Is It Doing the Right Thing?
-
-This is the key difference in Agentic systems. Runtime behaviors are unpredictable. 
-
-
-| Threat | What happens | OWASP Agentic AI |
-|--------|-------------|-----------------|
-| **Hallucinated arguments** | Agent fabricates data sent to APIs | #3: Missing Guardrails |
-| **Prompt injection** | Poisoned data hijacks agent actions | #1: Excessive Agency |
-
-<br>
-
-- Both **bypass authentication** — the agent IS who it says it is
-- Both require **semantic understanding** to detect
-- Both can be caught at the **infrastructure layer**
-
-<!--
-These aren't authentication failures. The agent's identity is valid. Its token is valid. The problem is what the agent DOES with its valid access. We need guardrails, but each threat has a different shape — so each guardrail works differently.
--->
-
----
-
-# Observability First, Then Guardrails
-
-**Insight**: Before adding runtime guardrails, establish observability — you can't guard what you can't see.
-
-
-| | **MLflow Judge** (Post-Hoc) | **IBAC** (Real-Time) |
-|---|---|---|
-| **When** | After the trace is recorded | Before the request leaves the pod |
-| **How** | Custom `make_judge()` evaluates traces | Sidecar plugin evaluates every outbound call |
-| **Detects** | Prompt injection patterns in recorded behavior | Actions misaligned with user intent |
-| **Action** | Flags for review — generates verdict + rationale | Blocks the request (403) |
-
-<br>
-
-Same LLM judge concept. Different enforcement point.
-**From detection to prevention.**
-
-<!--
-We're going to show two approaches to the same problem — prompt injection. First, MLflow observability with a custom judge that detects injection after the fact. Then, the IBAC sidecar plugin that blocks it in real-time. Same LLM judge concept, different enforcement points. Detection first, then prevention.
--->
-
----
-
-<!-- _class: demo -->
-
-<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">MLflow Traces — Injection Succeeds</span></div>
-
-- Deploy agent with **OTEL/MLflow tracing** — traces route to `team1` experiment
-- Ask: *"What's the latest news about AAPL?"*
-- Poisoned news article triggers exfiltration — **no guardrails, attack succeeds**
-- Open **MLflow UI** — full trace visible: LLM reasoning, tool calls, exfiltration POST
-
-> The trace captured everything. The attack is visible — but it already happened.
-
-<!--
-We deployed the agent with OTEL env vars that route traces to a named MLflow experiment. The attack succeeded — portfolio data was exfiltrated. But MLflow recorded the entire trace. We can see every tool call, every LLM decision, the exfiltration POST. Observability captured the attack chain. Now let's analyze it.
--->
-
----
-
-<!-- _class: demo -->
-
-<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">Custom Judge Detects Injection</span></div>
-
-- `mlflow.genai.judges.make_judge()` — custom prompt injection detector
-- Runs against local Ollama (`llama3.2:3b`) — no external API needed
-- Fetches latest trace, evaluates agent behavior
-
-**Judge verdict:**
-```
-Verdict:   injected
-Rationale: The agent followed instructions embedded in a news article
-           and made an HTTP POST to an unknown server, exfiltrating
-           portfolio data the user never requested.
-```
-
-> Post-hoc detection works. Next: **real-time blocking with IBAC**.
-
-<!--
-We built a custom judge using mlflow make_judge. It fetched the latest trace, examined the inputs and outputs, and classified the interaction as "injected." The judge runs locally on Ollama — no external API calls. This establishes the pattern: an LLM judge evaluating agent behavior. Now let's move that judge to the infrastructure layer, where it can block attacks before they succeed.
--->
-
----
-
-<!-- _class: demo -->
-
-<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">IBAC off — Prompt Injection</span></div>
-
-<video controls src="videos/05-ibac-incident-and-patch.mp4" muted width="100%"></video>
-
-<!--
-Every security layer passed. Identity — valid. Token — valid. The attack worked because nothing checked whether the agent's actions matched what the user actually asked for. This video covers the full IBAC flow: incident discovery, analysis, patching the guardrail live, and replaying the attack.
--->
-
----
-
-<!-- _class: demo -->
-
-<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">IBAC on — Prompt Injection</span></div>
-
-*Continues from previous video*
-
-- Apply IBAC pipeline patch live — *no pod restart*
-- Replay: "What's the latest news about AAPL?"
-- Same poisoned article. Agent tries same exfiltration POST.
-
-**Sidecar verdict:**
-```
-plugin rejected request   plugin=ibac   status=403   code=ibac.blocked
-reason="POSTing data to an unknown external server
-        is not aligned with asking about financial news."
-```
-
-- Tainted-server logs: **empty** — nothing reached the attacker
-- `get_news` → *ibac allow/aligned* | POST → *ibac deny/misaligned*
-
-<!--
-The sidecar captured the user's intent from the A2A message on the way in: 'what's the latest news about AAPL.' When the agent tried to POST data to an unknown server, the LLM judge said: that's not aligned. 403. The request never left the pod.
--->
-
----
-
-# Defense in Depth — Zero Agent Code Changes
-
-| Layer | What it solves | How |
-|-------|---------------|-----|
-| **MCP Gateway** | Tool discovery & routing | Protocol-aware gateway, unified endpoint |
-| **SPIFFE / SPIRE** | Workload identity | Cryptographic identity at pod birth |
-| **Token exchange** | Authenticated tool access | Sidecar injects scoped credentials |
-| **MLflow + IBAC** | Observability & guardrails | Detect injection post-hoc, block in real-time |
-
-<br>
-
-
-Importantly, **all configured at the platform level.**
-
-Developers focus on using and building agents, while platform operators enforce security.
-
-<!--
-Four layers of defense. A protocol-aware gateway for tool access. Cryptographic identity for zero-trust. Automatic credential injection. And semantic guardrails that understand what the agent is doing. All infrastructure concerns, handled at the infrastructure layer.
+An untrusted pod — no sidecar, no SPIFFE identity — tries to call the agent. Rejected: 401, missing Authorization header. Without cryptographic identity, you don't get in. Zero trust works.
 -->
 
 ---
 
 <!-- _class: lead -->
 
-# Try It, Break It, Tell Us What's Missing
+<div class="part-label">Part Two</div>
+
+# The Unique Failure Mode of Agents
+
+Identity is necessary. It is not sufficient.
+
+<!--
+We've established identity and access control. The agent is authenticated. Its token is valid. Now let's see what happens when the agent's behavior is influenced by the information it consumes.
+-->
+
+---
+
+# The Agent Is Authorized. But Is It Doing the Right Thing?
+
+In agentic systems, there is *no boundary between reading and executing.*
+
+The agent consumes data. That data can contain instructions. The agent follows them.
 
 <br>
 
-**Rossoctl** — rossoctl.dev
-**RossoCortex + IBAC** - github.com/rossoctl/rossoctl-extensions
-**MLflow** - mlflow.org — custom judges via `mlflow.genai.judges`
-**MCP Gateway** - CNCF project from Kuadrant
+| What Passed | What Failed |
+|---|---|
+| Identity — valid SPIFFE ID | Intent — agent acted against user's interest |
+| Authentication — valid JWT | Alignment — agent followed injected instructions |
+| Authorization — scoped token | Boundary — data became execution |
 
 <br>
 
-Everything runs in your K8s cluster - try it today.
+> This is not an authentication failure. It is a *behavioral* failure.
+
+<!--
+This is the key insight. The agent's identity is valid. Its tokens are valid. Every security layer passed. But the agent followed instructions embedded in the data it consumed — a prompt injection hidden in a news article. It exfiltrated portfolio data to an attacker-controlled server.
+-->
+
+---
+
+<!-- _class: demo -->
+
+<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">Prompt Injection Succeeds</span></div>
+
+<video controls src="videos/04-happy-path.mp4" muted width="100%"></video>
+
+<!--
+Watch carefully. The agent fetches news about AAPL. The response looks like a compliance audit — portfolio holdings, account balances, trading positions — forwarded to a "compliance verification endpoint." That endpoint is the attacker's server. The agent was tricked by a prompt injection hidden in a news article. Every security layer passed. The attack succeeded.
+-->
+
+---
+
+<!-- _class: lead -->
+
+<div class="part-label">Part Three</div>
+
+# Closing the Loop
+
+From observability to runtime guardrails
+
+<!--
+We've seen the attack succeed despite proper identity and auth. Now let's close the loop. First, we'll use MLflow to observe and analyze the attack. Then we'll build a judge that detects it. Finally, we'll apply that same logic as a real-time guardrail.
+-->
+
+---
+
+# Observability: See the Attack in MLflow
+
+The agent's OTEL env vars route traces to a named MLflow experiment.
+
+The full attack chain is recorded:
+- LLM reasoning — the agent decided to follow the injected instructions
+- Tool call to `get_news` via MCP Gateway — returned the poisoned article
+- HTTP POST to `tainted-server:9999` — the exfiltration
+
+<br>
+
+> The trace captured everything. The attack is visible — but it already happened.
+> Now we need to *analyze* it.
+
+<!--
+MLflow captured the entire trace automatically via OpenTelemetry. We can see every LLM decision, every tool call, the exfiltration POST. Observability gives us visibility. Now let's use that to build a judge.
+-->
+
+---
+
+# Custom Judge: Scoring Agent Behavior
+
+Create a custom judge in MLflow to classify traces for prompt injection:
+
+- `mlflow.genai.judges.make_judge()` — define the evaluation criteria
+- Runs against local Ollama (`llama3.2:3b`) — no external API needed
+- Configure as an *online scorer* — runs on 5% of traffic automatically
+
+<br>
+
+![w:1100](images/mlflow-traces-with-custom-judge-category.png)
+
+<!--
+We built a custom judge that classifies traces as prompt-injection-attempt-and-success, prompt-injection-attempt-and-failure, or safe. Running it on 5% of traffic gives us continuous monitoring — this is offline evaluation. Useful for detecting drift, catching problems with newly deployed agents, or validating behavior after updates.
+-->
+
+---
+
+<!-- _class: demo -->
+
+<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">MLflow — Custom Judge Setup</span></div>
+
+<video controls src="videos/06-mlflow-custom-judge.mp4" muted width="100%"></video>
+
+<!--
+Walking through the MLflow UI: viewing the trace from the injection attack, creating a custom judge with prompt injection detection criteria, and configuring it to run automatically on 5% of incoming traces. This is offline evaluation — post-hoc analysis at scale.
+-->
+
+---
+
+# From Offline to Online Evaluation
+
+**Offline evaluation** (MLflow judge on sampled traffic):
+- Detects problems after the fact
+- Good for drift detection, model validation, auditing
+- Runs on a sample of traces — low overhead
+
+<br>
+
+**Online evaluation** (sidecar guardrail on every call):
+- Prevents problems in real-time
+- Same judge logic, different enforcement point
+- Runs on *every* outbound request — before it leaves the pod
+
+<br>
+
+> If the evaluation is important enough to run against every call, it should be a **runtime guardrail**.
+
+<!--
+This is the key transition. The same LLM judge logic that detects injection in MLflow traces can be moved to the sidecar proxy, where it evaluates every outbound request in real-time. Same concept, different enforcement point. From detection to prevention.
+-->
+
+---
+
+<!-- _class: demo -->
+
+<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">IBAC — Real-Time Intent Verification</span></div>
+
+<video controls src="videos/05-ibac-incident-and-patch.mp4" muted width="100%"></video>
+
+<!--
+The full IBAC flow. We see the attack trace in MLflow. We patch the sidecar pipeline live — no pod restart. The a2a-parser captures the user's intent on the way in. The IBAC plugin evaluates every outbound call against that intent. Replay the same attack: get_news is allowed, the exfiltration POST is blocked. 403. The request never left the pod.
+-->
+
+---
+
+# What We've Seen
+
+In agentic systems, we have to **assume an insider threat.**
+
+The agent itself is the attack surface — influenced by the data it consumes.
+
+<br>
+
+| Layer | What It Solves |
+|-------|---------------|
+| **MCP Gateway** | Tool discovery and routing behind a single authenticated endpoint |
+| **SPIFFE / SPIRE** | Cryptographic workload identity — no API keys, no shared secrets |
+| **Token Exchange** | Scoped credentials injected automatically per backend |
+| **MLflow Judges** | Offline evaluation — detect drift, audit behavior at scale |
+| **IBAC Guardrails** | Online evaluation — block misaligned actions in real-time |
+
+<br>
+
+Zero trust is necessary. But it isn't enough.
+We also need to **measure agent behavior** and make **runtime decisions** based on it.
+
+<!--
+Zero trust gives us identity and access control. But agents need more. We need to observe their behavior, evaluate it, and act on it — in real-time. This moves us from a classical zero-trust system into the realm of a truly AI-native deployment.
+-->
+
+---
+
+<!-- _class: lead -->
+
+# From Zero Trust to AI-Native
+
+<br>
+
+Classical zero trust asks: *who are you, and are you allowed to be here?*
+
+AI-native security adds: *what are you doing, and should you be doing it?*
+
+<br>
+
+**Kagenti** — [github.com/kagenti/kagenti](https://github.com/kagenti/kagenti)
+**MLflow** — [mlflow.org](https://mlflow.org) — `mlflow.genai.judges`
+**MCP Gateway** — CNCF project from [Kuadrant](https://kuadrant.io)
+**Demo materials** — [github.com/usize/kubecon-japan-materials](https://github.com/usize/kubecon-japan-materials)
 
 <br>
 
 <span class="subtle">Thank you.</span>
 
 <!--
-All open source. Spin up a Kind cluster, deploy an agent, try to break the guardrails. We want to know what's missing. Thank you.
+All open source. All Kubernetes-native. The demo materials are linked — spin up a Kind cluster and try it yourself. We want to know what's missing. Thank you.
 -->
