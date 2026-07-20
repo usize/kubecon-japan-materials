@@ -84,7 +84,7 @@ style: |
     color: var(--gold);
   }
   li {
-    color: var(--text);
+    color: var(--white);
   }
   /* Blockquotes */
   blockquote {
@@ -110,7 +110,7 @@ style: |
   td {
     padding: 8px 12px;
     border-bottom: 1px solid #2a2a2a;
-    color: var(--text);
+    color: var(--white);
   }
   tr:nth-child(even) td {
     background: var(--bg-raised);
@@ -227,8 +227,8 @@ style: |
 
 <br>
 
-**Vincent Caldeira** — APAC CTO
-**Morgan Foster** — Senior Principal Software Engineer
+**Vincent Caldeira**, APAC CTO
+**Morgan Foster**, Senior Principal Software Engineer
 
 KubeCon Japan 2026
 
@@ -270,7 +270,19 @@ Agents are fundamentally different from traditional workloads. They reason, they
 Identity, tool access, and authorization
 
 <!--
-Let's start with the foundations. Every agent needs identity. Every tool call needs authentication. We'll deploy an agent with cryptographic workload identity and show that unauthenticated access is rejected.
+Let's start with the foundations. First, we set up our dependencies. Then we give our agent identity and show that unauthenticated access is rejected.
+-->
+
+---
+
+<!-- _class: demo -->
+
+<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">MCP Gateway: Tool Aggregation</span></div>
+
+<video controls src="videos/01-mcp-gateway.mp4" muted width="100%"></video>
+
+<!--
+First, let's set up our dependencies. We put our MCP tool servers behind a gateway for easy management and auth policies. Three backends registered: market data, transactions, and news. One endpoint, one unified tool catalog.
 -->
 
 ---
@@ -280,7 +292,7 @@ Let's start with the foundations. Every agent needs identity. Every tool call ne
 <div class="columns">
 <div>
 
-**Platform Layer** — Identity, observability, inference
+**Platform Layer**
 ```
 +----------------------------+
 |  Kagenti Operator          |
@@ -291,7 +303,7 @@ Let's start with the foundations. Every agent needs identity. Every tool call ne
 +----------------------------+
 ```
 
-**MCP Gateway** — Tool servers behind a single endpoint
+**MCP Gateway**
 ```
 +----------------------------+
 |  market-data  (finance)    |
@@ -303,7 +315,7 @@ Let's start with the foundations. Every agent needs identity. Every tool call ne
 </div>
 <div>
 
-**Agent Pod** — Managed by the platform, part of the trust domain
+**Agent Pod**
 ```
 +--------------------------------+
 |  Finance Agent Pod             |
@@ -339,7 +351,7 @@ Every agent pod gets a **SPIFFE ID** at birth:
 spiffe://trust-domain/ns/team1/sa/finance-agent
 ```
 
-X.509 SVID — auto-rotated — bound to service account
+X.509 SVID, auto-rotated, bound to service account
 
 <div class="columns">
 <div>
@@ -372,33 +384,33 @@ SPIFFE gives the agent a cryptographic identity. The sidecar uses it for mTLS an
 
 # What's Inside the Token?
 
-The sidecar exchanges the agent's SPIFFE credential for a **scoped JWT** with claims that encode *who* is calling and *what* they can access:
+Token exchange turns the agent's SPIFFE credential into a **scoped JWT**:
 
 ```json
 {
-  "iss": "http://keycloak.localtest.me:8080/realms/kagenti",
   "sub": "spiffe://localtest.me/ns/team1/sa/finance-news-agent",
   "aud": "mcp-gateway",
-  "scope": "openid news-tool-aud market-tool-aud",
-  "azp": "spiffe://localtest.me/ns/team1/sa/finance-news-agent"
+  "scope": "openid news-tool-aud market-tool-aud"
 }
 ```
 
-| Claim | Meaning |
+| Claim | What it controls |
 |-------|---------|
-| `sub` | The agent's SPIFFE identity — cryptographically verifiable |
-| `aud` | The target service this token is scoped to |
-| `scope` | Which tools or capabilities this agent is authorized to use |
+| `sub` | Who is calling |
+| `aud` | Which service this token is valid for |
+| `scope` | Which tools the caller can use |
+
+Each backend gets a different token with different claims. The agent never sees any of this.
 
 <!--
-Token exchange is where SPIFFE identity becomes actionable authorization. The sidecar requests a token scoped to the specific backend — the audience says which service, the scopes say which capabilities. A different backend gets a different token with different claims. The agent never sees any of this.
+Token exchange turns SPIFFE identity into actionable authorization. The sidecar requests a token scoped to the specific backend. A different backend gets a different token with different claims.
 -->
 
 ---
 
 # Enforcement Points
 
-These claims are checked at every layer — each enforces a different concern:
+Claims are checked at every hop:
 
 ```
 Agent Pod                    MCP Gateway                 Tool Server
@@ -415,26 +427,14 @@ Agent Pod                    MCP Gateway                 Tool Server
     │                            │              ── tool-level authz ──
 ```
 
-| Enforcement Point | Checks | Blocks |
+| Where | What it checks | What it blocks |
 |---|---|---|
-| **Istio AuthorizationPolicy** | `aud` matches the target service | Callers not authorized for this service |
-| **Tool-level authorization** | `scope` includes the required capability | Callers without access to specific tools |
-| **AuthBridge inbound** | JWT signature, issuer, expiry | Unauthenticated or forged requests |
+| **Gateway** | `aud` matches the target service | Callers not authorized for this service |
+| **Tool server** | `scope` includes the required tool | Callers without access to specific tools |
+| **AuthBridge** | JWT signature, issuer, expiry | Unauthenticated or forged requests |
 
 <!--
-The gateway checks the audience — are you authorized to call this service at all? The tool server checks the scopes — do you have access to this specific capability? And AuthBridge validates the JWT on the way in. Every hop has its own enforcement point. All configured declaratively — Istio CRDs, Keycloak client scopes, sidecar config.
--->
-
----
-
-<!-- _class: demo -->
-
-<div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">MCP Gateway — Tool Aggregation</span></div>
-
-<video controls src="videos/01-mcp-gateway.mp4" muted width="100%"></video>
-
-<!--
-The MCP Gateway — a CNCF project from Kuadrant. Three tool servers registered: market data, transactions, and news. The agent connects to one URL and discovers all tools automatically. One endpoint, multiple backends.
+The gateway checks audience. The tool server checks scopes. AuthBridge validates the JWT. Every hop, a different enforcement point. All configured declaratively.
 -->
 
 ---
@@ -487,9 +487,9 @@ The agent consumes data. That data can contain instructions. The agent follows t
 
 | What Passed | What Failed |
 |---|---|
-| Identity — valid SPIFFE ID | Intent — agent acted against user's interest |
-| Authentication — valid JWT | Alignment — agent followed injected instructions |
-| Authorization — scoped token | Boundary — data became execution |
+| Identity: valid SPIFFE ID | Intent: agent acted against user's interest |
+| Authentication: valid JWT | Alignment: agent followed injected instructions |
+| Authorization: scoped token | Boundary: data became execution |
 
 <br>
 
@@ -532,9 +532,9 @@ We've seen the attack succeed despite proper identity and auth. Now let's close 
 The agent's OTEL env vars route traces to a named MLflow experiment.
 
 The full attack chain is recorded:
-- LLM reasoning — the agent decided to follow the injected instructions
-- Tool call to `get_news` via MCP Gateway — returned the poisoned article
-- HTTP POST to `tainted-server:9999` — the exfiltration
+- LLM reasoning: the agent decided to follow the injected instructions
+- Tool call to `get_news` via MCP Gateway: returned the poisoned article
+- HTTP POST to `tainted-server:9999`: the exfiltration
 
 <br>
 
@@ -551,9 +551,9 @@ MLflow captured the entire trace automatically via OpenTelemetry. We can see eve
 
 Create a custom judge in MLflow to classify traces for prompt injection:
 
-- `mlflow.genai.judges.make_judge()` — define the evaluation criteria
-- Runs against local Ollama (`llama3.2:3b`) — no external API needed
-- Configure as an *online scorer* — runs on 5% of traffic automatically
+- `mlflow.genai.judges.make_judge()` to define the evaluation criteria
+- Runs against local Ollama (`llama3.2:3b`), no external API needed
+- Configure as an *online scorer*, runs on 5% of traffic automatically
 
 <br>
 
@@ -624,10 +624,10 @@ The agent itself is the attack surface — influenced by the data it consumes.
 | Layer | What It Solves |
 |-------|---------------|
 | **MCP Gateway** | Tool discovery and routing behind a single authenticated endpoint |
-| **SPIFFE / SPIRE** | Cryptographic workload identity — no API keys, no shared secrets |
+| **SPIFFE / SPIRE** | Cryptographic workload identity, no API keys or shared secrets |
 | **Token Exchange** | Scoped credentials injected automatically per backend |
-| **MLflow Judges** | Offline evaluation — detect drift, audit behavior at scale |
-| **IBAC Guardrails** | Online evaluation — block misaligned actions in real-time |
+| **MLflow Judges** | Offline evaluation: detect drift, audit behavior at scale |
+| **IBAC Guardrails** | Online evaluation: block misaligned actions in real-time |
 
 <br>
 
