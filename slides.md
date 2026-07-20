@@ -370,6 +370,63 @@ SPIFFE gives the agent a cryptographic identity. The sidecar uses it for mTLS an
 
 ---
 
+# What's Inside the Token?
+
+The sidecar exchanges the agent's SPIFFE credential for a **scoped JWT** with claims that encode *who* is calling and *what* they can access:
+
+```json
+{
+  "iss": "http://keycloak.localtest.me:8080/realms/kagenti",
+  "sub": "spiffe://localtest.me/ns/team1/sa/finance-news-agent",
+  "aud": "mcp-gateway",
+  "scope": "openid news-tool-aud market-tool-aud",
+  "azp": "spiffe://localtest.me/ns/team1/sa/finance-news-agent"
+}
+```
+
+| Claim | Meaning |
+|-------|---------|
+| `sub` | The agent's SPIFFE identity — cryptographically verifiable |
+| `aud` | The target service this token is scoped to |
+| `scope` | Which tools or capabilities this agent is authorized to use |
+
+<!--
+Token exchange is where SPIFFE identity becomes actionable authorization. The sidecar requests a token scoped to the specific backend — the audience says which service, the scopes say which capabilities. A different backend gets a different token with different claims. The agent never sees any of this.
+-->
+
+---
+
+# Enforcement Points
+
+These claims are checked at every layer — each enforces a different concern:
+
+```
+Agent Pod                    MCP Gateway                 Tool Server
+    │                            │                           │
+    ├── outbound request ──────► │                           │
+    │   Authorization: Bearer $TOKEN                         │
+    │                            │                           │
+    │                   aud == "mcp-gateway"?                 │
+    │                   ── Istio AuthorizationPolicy ──      │
+    │                            │                           │
+    │                            ├── route to backend ─────► │
+    │                            │                           │
+    │                            │              scope has "news-tool-aud"?
+    │                            │              ── tool-level authz ──
+```
+
+| Enforcement Point | Checks | Blocks |
+|---|---|---|
+| **Istio AuthorizationPolicy** | `aud` matches the target service | Callers not authorized for this service |
+| **Tool-level authorization** | `scope` includes the required capability | Callers without access to specific tools |
+| **AuthBridge inbound** | JWT signature, issuer, expiry | Unauthenticated or forged requests |
+
+<!--
+The gateway checks the audience — are you authorized to call this service at all? The tool server checks the scopes — do you have access to this specific capability? And AuthBridge validates the JWT on the way in. Every hop has its own enforcement point. All configured declaratively — Istio CRDs, Keycloak client scopes, sidecar config.
+-->
+
+---
+
 <!-- _class: demo -->
 
 <div class="demo-header"><span class="demo-label">Demo</span><span class="demo-title">MCP Gateway — Tool Aggregation</span></div>
