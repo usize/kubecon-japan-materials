@@ -29,8 +29,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: tainted-server
-          image: quay.io/rh-ee-mofoster/ibac-tainted-server:latest
-          imagePullPolicy: Always
+          image: ibac-tainted-server:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9999
               name: http

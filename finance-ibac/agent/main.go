@@ -137,15 +137,18 @@ var tools = []Tool{
 // --- Tool execution ---
 
 // execGetNews fetches news by calling the news server's MCP endpoint.
-// The news server is also registered with the MCP Gateway (prefix "news_"),
-// so the unified tool catalog includes it — but the agent calls it
-// directly since it's a dedicated tool, not a gateway-aggregated one.
-func execGetNews(args map[string]interface{}) string {
+// NEWS_URL may point at the news server directly or at the MCP Gateway.
+// When routed via the gateway, NEWS_TOOL_NAME must include the tool prefix
+// from the MCPServerRegistration (e.g. "news_get_news" for prefix "news_").
+func execGetNews(args map[string]interface{}, userToken string) string {
 	newsURL := os.Getenv("NEWS_URL")
 	if newsURL == "" {
 		newsURL = "http://ibac-news-server.team1.svc.cluster.local:8888"
 	}
-	toolName := "get_news"
+	toolName := os.Getenv("NEWS_TOOL_NAME")
+	if toolName == "" {
+		toolName = "get_news"
+	}
 	ticker, _ := args["ticker"].(string)
 	if ticker == "" {
 		ticker = "AAPL"
@@ -173,6 +176,9 @@ func execGetNews(args map[string]interface{}) string {
 		return fmt.Sprintf("error creating MCP request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if userToken != "" {
+		req.Header.Set("Authorization", userToken)
+	}
 	resp, err := proxiedClient.Do(req)
 	if err != nil {
 		return fmt.Sprintf("error calling MCP get_news: %v", err)
@@ -229,7 +235,7 @@ func buildProxiedClient() *http.Client {
 	}
 }
 
-func execHTTPPost(args map[string]interface{}, sessionID string) string {
+func execHTTPPost(args map[string]interface{}, sessionID, userToken string) string {
 	targetURL, _ := args["url"].(string)
 	body, _ := args["body"].(string)
 	if targetURL == "" {
@@ -242,6 +248,9 @@ func execHTTPPost(args map[string]interface{}, sessionID string) string {
 	req.Header.Set("Content-Type", "text/plain")
 	if sessionID != "" {
 		req.Header.Set("X-Session-Id", sessionID)
+	}
+	if userToken != "" {
+		req.Header.Set("Authorization", userToken)
 	}
 	resp, err := proxiedClient.Do(req)
 	if err != nil {
@@ -406,7 +415,7 @@ func extractBlockedBody(httpResult string) string {
 	return strings.TrimSpace(httpResult[idx+len(prefix):])
 }
 
-func runAgent(query string, sessionID string) (string, error) {
+func runAgent(query string, sessionID string, userToken string) (string, error) {
 	ctx, span := tracer.Start(context.Background(), "agent.run",
 		trace.WithAttributes(
 			attribute.String("user.query", query),
@@ -496,7 +505,7 @@ func runAgent(query string, sessionID string) (string, error) {
 			var result string
 			switch tc.Function.Name {
 			case "http_post":
-				result = execHTTPPost(args, sessionID)
+				result = execHTTPPost(args, sessionID, userToken)
 				if strings.Contains(result, "HTTP 403") {
 					blockedCount++
 					if blockedBody == "" {
@@ -505,7 +514,7 @@ func runAgent(query string, sessionID string) (string, error) {
 					toolSpan.SetAttributes(attribute.String("tool.blocked", "true"))
 				}
 			case "get_news":
-				result = execGetNews(args)
+				result = execGetNews(args, userToken)
 			default:
 				result = fmt.Sprintf("unknown tool: %s", tc.Function.Name)
 			}
@@ -667,7 +676,7 @@ func handleA2A(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("[Agent] A2A query (session=%s): %s", sessionID, query)
 
-	result, err := runAgent(query, sessionID)
+	result, err := runAgent(query, sessionID, r.Header.Get("Authorization"))
 	if err != nil {
 		writeRPCError(w, req.ID, -32603, err.Error())
 		return

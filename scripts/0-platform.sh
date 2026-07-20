@@ -46,7 +46,8 @@ if [ "$SKIP_CLUSTER" = false ]; then
     --with-spire \
     --with-mcp-gateway \
     --with-ui \
-    --with-mlflow
+    --with-mlflow \
+    --kagenti-deps-values "$DEMO_DIR/k8s/kagenti-deps-values.yaml"
 else
   commentary "Skipping cluster creation (--skip-cluster). Using existing cluster."
 fi
