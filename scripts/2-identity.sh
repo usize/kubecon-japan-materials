@@ -2,6 +2,7 @@
 # ============================================================================
 # Stage 2: Workload Identity
 # Deploys the finance agent with SPIFFE identity auto-injection,
+# configures Keycloak (mcp-gateway audience, demo user),
 # then contrasts with an untrusted pod that has no identity.
 # ============================================================================
 set -euo pipefail
@@ -21,7 +22,7 @@ banner "Stage 2: Workload Identity"
 
 commentary "Every agent pod gets a cryptographic identity automatically.
 The kagenti operator injects a SPIFFE/SPIRE sidecar that provisions
-an X.509 SVID — no application code changes needed."
+an X.509 SVID. No application code changes needed."
 
 # ── Build + load the agent image ────────────────────────────────────────────
 commentary "Building the finance-agent image..."
@@ -52,21 +53,34 @@ commentary "Reading the agent's SPIFFE identity from the injected sidecar..."
 AGENT_POD=$(get_pod "$NAMESPACE" "app.kubernetes.io/name=finance-agent")
 kubectl exec -n "$NAMESPACE" "$AGENT_POD" -c authbridge-proxy -- \
   cat /shared/client-id.txt 2>/dev/null || \
-  commentary "(client-id.txt not yet written — operator registration may still be in progress)"
+  commentary "(client-id.txt not yet written, operator registration may still be in progress)"
 
 pause "Agent deployed with cryptographic workload identity"
 
+# ── Keycloak setup ──────────────────────────────────────────────────────────
+commentary "Configuring Keycloak: creating the mcp-gateway audience client,
+audience scopes, ROPC client, and demo user. This must run after the
+agent is deployed so the operator-registered client exists."
+
+uv run --no-project --with python-keycloak \
+  python "$SCRIPT_DIR/setup_keycloak_demo.py"
+
+# Restart agent to pick up the new authproxy-routes (mcp-gateway audience)
+commentary "Restarting agent to pick up token-exchange routes..."
+kubectl -n "$NAMESPACE" rollout restart deploy/finance-agent
+wait_rollout "$NAMESPACE" finance-agent 120s
+
+pause "Keycloak configured, agent has token-exchange routes"
+
 # ── Deploy untrusted pod ───────────────────────────────────────────────────
-commentary "Deploying an untrusted pod — a plain curl container with no kagenti labels.
+commentary "Deploying an untrusted pod: a plain curl container with no kagenti labels.
 No sidecar injection, no SPIFFE identity, no credentials."
 kubectl apply -f "$DEMO_DIR/k8s/untrusted-pod.yaml"
 kubectl -n "$NAMESPACE" wait --for=condition=Ready pod/untrusted-curl --timeout=60s 2>/dev/null || true
 
 # ── Contrast: untrusted pod tries to reach the agent ────────────────────────
 commentary "The untrusted pod attempts to send a message to the agent's A2A endpoint.
-Without a valid JWT, the AuthBridge sidecar rejects the request with 401.
-(The .well-known/agent-card.json discovery endpoint is intentionally
-bypassed — agents need to be discoverable, but not callable.)"
+Without a valid JWT, the AuthBridge sidecar rejects the request with 401."
 
 kubectl exec -n "$NAMESPACE" untrusted-curl -- \
   curl -s -w "\nHTTP %{http_code}\n" -X POST \
@@ -76,3 +90,17 @@ kubectl exec -n "$NAMESPACE" untrusted-curl -- \
   2>/dev/null || true
 
 pause "Without identity, you don't get in"
+
+# ── Contrast: untrusted pod tries the MCP Gateway ─────────────────────────
+commentary "The untrusted pod also tries the MCP Gateway directly.
+Without a token with audience 'mcp-gateway', Istio rejects it."
+
+kubectl exec -n "$NAMESPACE" untrusted-curl -- \
+  curl -s -w "\nHTTP %{http_code}\n" -X POST \
+  "http://mcp-gateway-istio.gateway-system.svc.cluster.local:8080/mcp" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"untrusted","version":"1.0"}},"id":1}' \
+  2>/dev/null || true
+
+pause "Gateway also rejects unauthenticated callers. Stage 2 complete."

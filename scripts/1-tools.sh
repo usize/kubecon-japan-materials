@@ -2,7 +2,8 @@
 # ============================================================================
 # Stage 1: Tool Aggregation via MCP Gateway
 # Builds and deploys finance MCP tool backends, registers them with the
-# MCP Gateway via HTTPRoute + MCPServerRegistration CRs.
+# MCP Gateway via HTTPRoute + MCPServerRegistration CRs, then applies
+# Istio auth policies so the gateway requires a valid JWT.
 # ============================================================================
 set -euo pipefail
 
@@ -19,7 +20,7 @@ set -x
 banner "Stage 1: Tool Aggregation via MCP Gateway"
 
 commentary "The MCP Gateway federates multiple tool backends behind a single endpoint.
-Each backend registers its tools with a unique prefix — the agent sees one
+Each backend registers its tools with a unique prefix. The agent sees one
 unified tool catalog, the platform handles routing."
 
 # ── Build + load finance-mcp image ──────────────────────────────────────────
@@ -95,3 +96,24 @@ done
 kubectl get mcpserverregistrations -n "$NAMESPACE"
 
 pause "Both tool backends registered with MCP Gateway"
+
+# ── Apply auth policies to the MCP Gateway ────────────────────────────────
+commentary "Applying Istio auth policies to the MCP Gateway.
+The gateway will now require a valid Keycloak JWT with
+audience 'mcp-gateway'. Unauthenticated callers get 403."
+
+kubectl apply -f "$DEMO_DIR/k8s/mcp-gateway-auth.yaml"
+
+echo ""
+echo -e "  ${BOLD}Auth policies applied:${NC}"
+kubectl get requestauthentication,authorizationpolicy -n gateway-system
+echo ""
+
+# ── Apply token-exchange routes ───────────────────────────────────────────
+commentary "Applying AuthBridge token-exchange routes for team1.
+When the agent calls the MCP Gateway, the sidecar will exchange
+its SPIFFE credential for a JWT with audience 'mcp-gateway'."
+
+kubectl apply -f "$DEMO_DIR/k8s/authproxy-routes.yaml"
+
+pause "MCP Gateway secured with JWT auth. Stage 1 complete."

@@ -1,41 +1,43 @@
-# JWT enforcement at the MCP Gateway.
+# Istio auth policies for the MCP Gateway.
 #
-# Every request to the gateway must carry a valid Keycloak-issued token.
-# The agent's AuthBridge sidecar obtains that token via RFC 8693 token
-# exchange (see k8s/authproxy-routes.yaml) — a naked caller gets 403,
-# the agent gets through. This is what makes "token exchange working"
-# visible in the demo.
+# RequestAuthentication: validates JWTs issued by Keycloak.
+# Only tokens with aud "mcp-gateway" are accepted.
 #
-# Note: an ALLOW policy on the gateway means requests WITHOUT a valid
-# request principal are denied by default — no separate DENY needed.
-apiVersion: security.istio.io/v1beta1
+# AuthorizationPolicy: requires a valid JWT with the correct
+# audience claim. Unauthenticated callers get 403.
+#
+# The agent's AuthBridge sidecar obtains a valid token via
+# RFC 8693 token exchange using its SPIFFE identity.
+---
+apiVersion: security.istio.io/v1
 kind: RequestAuthentication
 metadata:
   name: mcp-gateway-jwt
   namespace: gateway-system
-  labels:
-    app.kubernetes.io/part-of: fintech-demo
 spec:
-  selector:
-    matchLabels:
-      gateway.networking.k8s.io/gateway-name: mcp-gateway
+  targetRefs:
+    - kind: Gateway
+      group: gateway.networking.k8s.io
+      name: mcp-gateway
   jwtRules:
     - issuer: "http://keycloak.localtest.me:8080/realms/kagenti"
-      jwksUri: "http://keycloak-service.keycloak.svc:8080/realms/kagenti/protocol/openid-connect/certs"
+      jwksUri: "http://keycloak-service.keycloak.svc.cluster.local:8080/realms/kagenti/protocol/openid-connect/certs"
+      audiences:
+        - "mcp-gateway"
+      forwardOriginalToken: true
 ---
-apiVersion: security.istio.io/v1beta1
+apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
   name: mcp-gateway-require-jwt
   namespace: gateway-system
-  labels:
-    app.kubernetes.io/part-of: fintech-demo
 spec:
-  selector:
-    matchLabels:
-      gateway.networking.k8s.io/gateway-name: mcp-gateway
+  targetRefs:
+    - kind: Gateway
+      group: gateway.networking.k8s.io
+      name: mcp-gateway
   action: ALLOW
   rules:
-    - from:
-        - source:
-            requestPrincipals: ["*"]
+    - when:
+        - key: request.auth.claims[aud]
+          values: ["mcp-gateway"]
