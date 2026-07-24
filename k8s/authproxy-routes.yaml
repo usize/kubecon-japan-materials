@@ -19,4 +19,4 @@ data:
   routes.yaml: |
     - host: "mcp-gateway-istio.gateway-system.svc.cluster.local"
       target_audience: "mcp-gateway"
-      token_scopes: "openid"
+      token_scopes: "openid mcp-gateway-aud"
