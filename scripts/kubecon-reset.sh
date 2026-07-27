@@ -20,7 +20,8 @@ kubectl delete mcpserverregistrations -n "$NAMESPACE" --all --ignore-not-found 2
 kubectl delete httproutes -n "$NAMESPACE" --all --ignore-not-found 2>/dev/null
 
 echo "[*] Restarting MCP Gateway to clear stale state..."
-kubectl -n mcp-system rollout restart deploy/mcp-gateway 2>/dev/null
+kubectl -n mcp-system rollout restart deploy/mcp-gateway deploy/mcp-gateway-controller 2>/dev/null
 kubectl -n mcp-system rollout status deploy/mcp-gateway --timeout=60s
+kubectl -n mcp-system rollout status deploy/mcp-gateway-controller --timeout=60s
 
 echo "[*] Clean. Ready for: ./scripts/kubecon-demo.sh"

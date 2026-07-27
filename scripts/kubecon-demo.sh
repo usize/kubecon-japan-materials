@@ -46,8 +46,9 @@ kubectl apply \
   -f "$DEMO_DIR/k8s/news-server-httproute.yaml" \
   -f "$DEMO_DIR/k8s/news-server-registration.yaml"
 
-kubectl -n mcp-system rollout restart deploy/mcp-gateway
+kubectl -n mcp-system rollout restart deploy/mcp-gateway deploy/mcp-gateway-controller
 kubectl -n mcp-system rollout status deploy/mcp-gateway --timeout=60s
+kubectl -n mcp-system rollout status deploy/mcp-gateway-controller --timeout=60s
 
 commentary "Waiting for all MCPServerRegistrations to go Ready..."
 for reg in finance-mcp-servers finance-tool-servers news-server; do
