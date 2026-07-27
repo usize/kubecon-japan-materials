@@ -77,6 +77,6 @@ fi
 banner "Demo Complete"
 echo -e "${GREEN}All stages finished.${NC}"
 echo ""
-echo -e "  UI:       ${CYAN}http://kagenti-ui.localtest.me:8080${NC}"
+echo -e "  UI:       ${CYAN}http://rossoctl-ui.localtest.me:8080${NC}"
 echo -e "  Teardown: ${CYAN}./scripts/teardown.sh${NC}"
 echo ""

@@ -1,4 +1,4 @@
-# A plain curl pod with NO kagenti labels — no sidecar injection,
+# A plain curl pod with NO rossoctl labels — no sidecar injection,
 # no SPIFFE identity, no credentials. Used in Stage 2 to contrast
 # with the properly-identified finance agent.
 apiVersion: v1
@@ -9,7 +9,7 @@ metadata:
   labels:
     app.kubernetes.io/name: untrusted-curl
     app.kubernetes.io/part-of: fintech-demo
-    # Intentionally NO kagenti.io/inject label — no sidecar
+    # Intentionally NO rossoctl.io/inject label — no sidecar
 spec:
   restartPolicy: Never
   containers:

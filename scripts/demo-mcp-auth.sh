@@ -33,14 +33,14 @@ KC_ADMIN_TOKEN=$(curl -s -X POST "${KC_URL}/realms/master/protocol/openid-connec
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 
 MCP_CLIENT_UUID=$(curl -s -H "Authorization: Bearer $KC_ADMIN_TOKEN" \
-  "${KC_URL}/admin/realms/kagenti/clients?clientId=mcp-gateway" \
+  "${KC_URL}/admin/realms/rossoctl/clients?clientId=mcp-gateway" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['id'])")
 
 MCP_SECRET=$(curl -s -H "Authorization: Bearer $KC_ADMIN_TOKEN" \
-  "${KC_URL}/admin/realms/kagenti/clients/$MCP_CLIENT_UUID/client-secret" \
+  "${KC_URL}/admin/realms/rossoctl/clients/$MCP_CLIENT_UUID/client-secret" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['value'])")
 
-MCP_TOKEN=$(curl -s -X POST "${KC_URL}/realms/kagenti/protocol/openid-connect/token" \
+MCP_TOKEN=$(curl -s -X POST "${KC_URL}/realms/rossoctl/protocol/openid-connect/token" \
   -d "grant_type=client_credentials&client_id=mcp-gateway&client_secret=${MCP_SECRET}&scope=openid" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 

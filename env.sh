@@ -11,14 +11,14 @@ ZOO_ROOT="$(cd "$DEMO_DIR/.." && pwd)"
 # Cluster / namespace constants
 CLUSTER_NAME="${CLUSTER_NAME:-kagenti}"
 NAMESPACE="${NAMESPACE:-team1}"
-PLATFORM_NS="${PLATFORM_NS:-kagenti-system}"
+PLATFORM_NS="${PLATFORM_NS:-rossoctl-system}"
 
 # MCP Gateway in-cluster URL (Istio Gateway controller)
 MCP_GATEWAY_URL="http://mcp-gateway-istio.gateway-system.svc.cluster.local:8080/mcp"
 
 # Paths to dependencies (cloned into thirdparty/)
 KAGENTI_REPO="${KAGENTI_REPO:-git@github.com:usize/kagenti.git}"
-KAGENTI_BRANCH="${KAGENTI_BRANCH:-fix/mlflow-scorer-job-runner}"
+KAGENTI_BRANCH="${KAGENTI_BRANCH:-fix/mlflow-scorer-job-runner-v2}"
 KAGENTI_ROOT="$DEMO_DIR/thirdparty/kagenti"
 EXTENSIONS_ROOT="$DEMO_DIR/thirdparty/kagenti-extensions"
 
@@ -28,9 +28,9 @@ if [ ! -d "$KAGENTI_ROOT" ]; then
   mkdir -p "$DEMO_DIR/thirdparty"
   git clone --branch "$KAGENTI_BRANCH" --single-branch "$KAGENTI_REPO" "$KAGENTI_ROOT"
 fi
-SPARC_DEMO_DIR="$EXTENSIONS_ROOT/AuthBridge/demos/finance-sparc"
+SPARC_DEMO_DIR="$EXTENSIONS_ROOT/authbridge/demos/finance-sparc"
 IBAC_DEMO_DIR="$DEMO_DIR/finance-ibac"
-SETUP_SCRIPT="$KAGENTI_ROOT/scripts/kind/setup-kagenti.sh"
+SETUP_SCRIPT="$KAGENTI_ROOT/scripts/kind/setup-rossoctl.sh"
 
 # Image names (local-only, not pushed)
 FINANCE_TOOL_IMAGE="${FINANCE_TOOL_IMAGE:-finance-tool:latest}"

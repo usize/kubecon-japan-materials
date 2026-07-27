@@ -98,10 +98,10 @@ sleep 2
 commentary "Acquiring Keycloak token for MLflow API access..."
 OIDC_SECRET=$(kubectl get secret -n "$PLATFORM_NS" mlflow-oauth-secret \
   -o jsonpath='{.data.OIDC_CLIENT_SECRET}' | base64 -d)
-APP_PASS=$(kubectl get secret -n keycloak kagenti-test-user \
+APP_PASS=$(kubectl get secret -n keycloak rossoctl-test-user \
   -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null)
 MLFLOW_TOKEN=$(curl -s -X POST \
-  "http://keycloak.localtest.me:8080/realms/kagenti/protocol/openid-connect/token" \
+  "http://keycloak.localtest.me:8080/realms/rossoctl/protocol/openid-connect/token" \
   -d "grant_type=password&client_id=mlflow&client_secret=${OIDC_SECRET}&username=admin&password=${APP_PASS}&scope=openid" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 

@@ -15,13 +15,12 @@ kubectl -n "$NAMESPACE" delete agentruntime --all --ignore-not-found 2>/dev/null
 kubectl -n "$NAMESPACE" delete sa finance-news-agent --ignore-not-found 2>/dev/null
 kubectl -n "$NAMESPACE" delete pod untrusted-curl --ignore-not-found 2>/dev/null
 kubectl -n "$NAMESPACE" delete configmap authbridge-config-finance-news-agent --ignore-not-found 2>/dev/null
-kubectl -n "$NAMESPACE" delete secret -l kagenti.io/client-name=finance-news-agent --ignore-not-found 2>/dev/null
+kubectl -n "$NAMESPACE" delete secret -l rossoctl.io/client-name=finance-news-agent --ignore-not-found 2>/dev/null
 kubectl delete mcpserverregistrations -n "$NAMESPACE" --all --ignore-not-found 2>/dev/null
 kubectl delete httproutes -n "$NAMESPACE" --all --ignore-not-found 2>/dev/null
 
 echo "[*] Restarting MCP Gateway to clear stale state..."
-kubectl -n mcp-system rollout restart deploy/mcp-gateway deploy/mcp-gateway-controller 2>/dev/null
+kubectl -n mcp-system rollout restart deploy/mcp-gateway 2>/dev/null
 kubectl -n mcp-system rollout status deploy/mcp-gateway --timeout=60s
-kubectl -n mcp-system rollout status deploy/mcp-gateway-controller --timeout=60s
 
 echo "[*] Clean. Ready for: ./scripts/kubecon-demo.sh"

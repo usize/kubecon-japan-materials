@@ -21,7 +21,7 @@ set -x
 banner "Stage 2: Workload Identity"
 
 commentary "Every agent pod gets a cryptographic identity automatically.
-The kagenti operator injects a SPIFFE/SPIRE sidecar that provisions
+The rossoctl operator injects a SPIFFE/SPIRE sidecar that provisions
 an X.509 SVID. No application code changes needed."
 
 # ── Build + load the agent image ────────────────────────────────────────────
@@ -73,7 +73,7 @@ wait_rollout "$NAMESPACE" finance-agent 120s
 pause "Keycloak configured, agent has token-exchange routes"
 
 # ── Deploy untrusted pod ───────────────────────────────────────────────────
-commentary "Deploying an untrusted pod: a plain curl container with no kagenti labels.
+commentary "Deploying an untrusted pod: a plain curl container with no rossoctl labels.
 No sidecar injection, no SPIFFE identity, no credentials."
 kubectl apply -f "$DEMO_DIR/k8s/untrusted-pod.yaml"
 kubectl -n "$NAMESPACE" wait --for=condition=Ready pod/untrusted-curl --timeout=60s 2>/dev/null || true

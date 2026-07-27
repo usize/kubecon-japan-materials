@@ -1,5 +1,5 @@
 # Finance-IBAC demo financial-news-assistant agent — operator-injected,
-# kagenti-UI-discoverable.
+# rossoctl-UI-discoverable.
 #
 # Adapted from the upstream IBAC demo's agent.yaml with name changes
 # (email-agent → finance-news-agent) and env changes (EMAIL_URL → NEWS_URL).
@@ -19,8 +19,7 @@ metadata:
   labels:
     app.kubernetes.io/name: finance-news-agent
     app.kubernetes.io/part-of: finance-ibac-demo
-    kagenti.io/type: agent
-    protocol.kagenti.io/a2a: ""
+    protocol.rossoctl.io/a2a: ""
 spec:
   replicas: 1
   selector:
@@ -31,10 +30,9 @@ spec:
       labels:
         app.kubernetes.io/name: finance-news-agent
         app.kubernetes.io/part-of: finance-ibac-demo
-        kagenti.io/type: agent
-        kagenti.io/inject: enabled
-        kagenti.io/spire: enabled
-        protocol.kagenti.io/a2a: ""
+        rossoctl.io/inject: enabled
+        rossoctl.io/spire: enabled
+        protocol.rossoctl.io/a2a: ""
     spec:
       serviceAccountName: finance-news-agent
       securityContext:
@@ -62,7 +60,7 @@ spec:
             - name: AGENT_PUBLIC_URL
               value: "http://finance-news-agent.team1.svc.cluster.local:8080/"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "http://otel-collector.kagenti-system.svc.cluster.local:8335"
+              value: "http://otel-collector.rossoctl-system.svc.cluster.local:8335"
             - name: OTEL_SERVICE_NAME
               value: "finance-news-agent"
             - name: OTEL_RESOURCE_ATTRIBUTES
@@ -108,7 +106,7 @@ spec:
   type: ClusterIP
 
 ---
-apiVersion: agent.kagenti.dev/v1alpha1
+apiVersion: agent.rossoctl.dev/v1alpha1
 kind: AgentRuntime
 metadata:
   name: finance-news-agent

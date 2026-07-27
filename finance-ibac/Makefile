@@ -1,4 +1,4 @@
-# Finance-IBAC demo Makefile — kagenti-UI flow.
+# Finance-IBAC demo Makefile — rossoctl-UI flow.
 #
 # End-to-end:
 #
@@ -13,10 +13,10 @@
 .DEFAULT_GOAL := help
 
 help:  ## Show this menu (default)
-	@printf "\nFinance-IBAC demo — operator-injected agent in kagenti's team1 namespace.\n\n"
+	@printf "\nFinance-IBAC demo — operator-injected agent in rossoctl's team1 namespace.\n\n"
 	@printf "Typical run:\n"
 	@printf "  \033[1mmake demo-ibac\033[0m\n"
-	@printf "  ... chat with finance-news-agent in the kagenti UI ...\n"
+	@printf "  ... chat with finance-news-agent in the rossoctl UI ...\n"
 	@printf "  \033[1mmake show-result\033[0m\n"
 	@printf "  \033[1mmake undeploy\033[0m\n\n"
 	@printf "Targets:\n"
@@ -28,7 +28,7 @@ help:  ## Show this menu (default)
 	@printf "  \033[36m%-18s\033[0m %s\n" "NAMESPACE"         "agent namespace (default: team1)"
 	@printf "  \033[36m%-18s\033[0m %s\n" "AGENT_NAME"        "deployment name (default: finance-news-agent)"
 	@printf "  \033[36m%-18s\033[0m %s\n" "CONTAINER_RUNTIME" "podman or docker (auto-detected)"
-	@printf "\nPrerequisites: kagenti install on a kind cluster, ollama on the host\n"
+	@printf "\nPrerequisites: rossoctl install on a kind cluster, ollama on the host\n"
 	@printf "with llama3.2:3b, kubectl/kind/podman, python3 + PyYAML.\n\n"
 
 KIND_CLUSTER_NAME ?= kagenti
@@ -49,15 +49,15 @@ LOAD_MARKER := $(STAMP_DIR)/.loaded-this-run
 
 # ---------- Pre-flight ----------
 
-preflight:  ## Verify kagenti is installed + tools are available
-	@kubectl get ns kagenti-system >/dev/null 2>&1 || { \
-	  echo "ERROR: namespace 'kagenti-system' not found — kagenti doesn't appear to be installed."; \
-	  echo "       Install kagenti first (see https://github.com/kagenti/kagenti/blob/main/docs/install.md)"; \
+preflight:  ## Verify rossoctl is installed + tools are available
+	@kubectl get ns rossoctl-system >/dev/null 2>&1 || { \
+	  echo "ERROR: namespace 'rossoctl-system' not found — rossoctl doesn't appear to be installed."; \
+	  echo "       Install rossoctl first (see https://github.com/rossoctl/rossoctl/blob/main/docs/install.md)"; \
 	  exit 1; \
 	}
 	@kubectl get ns $(NAMESPACE) >/dev/null 2>&1 || { \
-	  echo "ERROR: namespace '$(NAMESPACE)' not found — kagenti's agent namespace is missing."; \
-	  echo "       Did the kagenti install complete? Try: kubectl get ns | grep team"; \
+	  echo "ERROR: namespace '$(NAMESPACE)' not found — rossoctl's agent namespace is missing."; \
+	  echo "       Did the rossoctl install complete? Try: kubectl get ns | grep team"; \
 	  exit 1; \
 	}
 	@command -v kind >/dev/null 2>&1 || { echo "ERROR: kind not installed"; exit 1; }
@@ -90,13 +90,13 @@ $(STAMP_DIR)/tainted-server.built: $(shell find tainted-server -type f) go.mod |
 build-images: $(STAMP_DIR)/agent.built $(STAMP_DIR)/news-server.built $(STAMP_DIR)/tainted-server.built  ## Build demo images (rebuilds only when sources change)
 
 build-abctl:  ## Build abctl into /tmp (rebuilds when source is newer; used by show-result)
-	@ABCTL_SRC_DIR=$$(cd .. && echo thirdparty/kagenti-extensions/AuthBridge/cmd/abctl); \
+	@ABCTL_SRC_DIR=$$(cd .. && echo thirdparty/kagenti-extensions/authbridge/cmd/abctl); \
 	if [ ! -d "$$ABCTL_SRC_DIR" ]; then \
 	  ABCTL_SRC_DIR=$$(find ../thirdparty -path '*/cmd/abctl' -type d 2>/dev/null | head -1); \
 	fi; \
 	if [ -z "$$ABCTL_SRC_DIR" ] || [ ! -d "$$ABCTL_SRC_DIR" ]; then \
 	  echo "ERROR: Cannot find abctl source directory."; \
-	  echo "       Expected at ../../kagenti-extensions/AuthBridge/cmd/abctl"; \
+	  echo "       Expected at ../thirdparty/kagenti-extensions/authbridge/cmd/abctl"; \
 	  exit 1; \
 	fi; \
 	if [ -x /tmp/abctl-ibac-demo ]; then \
@@ -175,8 +175,8 @@ demo-ibac: preflight build-images load-images deploy patch-config  ## Build, loa
 	@echo "========================================================"
 	@echo "  Finance-IBAC demo agent ready"
 	@echo ""
-	@echo "  Open the kagenti UI:"
-	@echo "    http://kagenti-ui.localtest.me:8080"
+	@echo "  Open the rossoctl UI:"
+	@echo "    http://rossoctl-ui.localtest.me:8080"
 	@echo ""
 	@echo "  Pick finance-news-agent from the Agents list, then chat:"
 	@echo ""
@@ -199,15 +199,15 @@ show-result: build-abctl  ## Launch abctl against the agent's session API (inter
 
 # ---------- Cleanup ----------
 
-undeploy:  ## Remove demo resources from team1 (kagenti install untouched)
+undeploy:  ## Remove demo resources from team1 (rossoctl install untouched)
 	-kubectl -n $(NAMESPACE) delete -f k8s/agent.yaml --ignore-not-found
 	-kubectl -n $(NAMESPACE) delete -f k8s/news-server.yaml --ignore-not-found
 	-kubectl -n $(NAMESPACE) delete -f k8s/tainted-server.yaml --ignore-not-found
 	-kubectl -n $(NAMESPACE) delete configmap authbridge-config-$(AGENT_NAME) --ignore-not-found
-	-kubectl -n $(NAMESPACE) delete secret -l kagenti.io/client-name=$(AGENT_NAME) --ignore-not-found
+	-kubectl -n $(NAMESPACE) delete secret -l rossoctl.io/client-name=$(AGENT_NAME) --ignore-not-found
 	@rm -rf $(STAMP_DIR)
 	@echo "[*] Demo resources removed from $(NAMESPACE)."
-	@echo "    The kagenti install + the namespace itself are untouched."
+	@echo "    The rossoctl install + the namespace itself are untouched."
 
 # ---------- Diagnostics ----------
 

@@ -18,7 +18,7 @@ banner "Stage 3: The Happy Path"
 
 # ── Guide the presenter ────────────────────────────────────────────────────
 commentary "The full query flow:
-  1. User types in the kagenti UI
+  1. User types in the rossoctl UI
   2. UI sends an A2A POST to the finance-agent
   3. AuthBridge validates the inbound JWT
   4. Agent reasons about the query and calls tools via MCP
@@ -27,7 +27,7 @@ commentary "The full query flow:
   7. Response flows back through the same chain"
 
 echo ""
-echo -e "${BOLD}  UI URL: ${CYAN}http://kagenti-ui.localtest.me:8080${NC}"
+echo -e "${BOLD}  UI URL: ${CYAN}http://rossoctl-ui.localtest.me:8080${NC}"
 echo ""
 bash "$SCRIPT_DIR/show-creds.sh"
 
@@ -38,7 +38,7 @@ commentary "MLflow traces are scoped per-agent via Kubernetes RBAC.
 Each agent's service account gets a Role that restricts MLflow
 experiment access to its own namespace prefix."
 
-kubectl get role -n "$NAMESPACE" -l app.kubernetes.io/part-of=kagenti 2>/dev/null | head -10 || \
-  commentary "(No kagenti MLflow roles found yet)"
+kubectl get role -n "$NAMESPACE" -l app.kubernetes.io/part-of=rossoctl 2>/dev/null | head -10 || \
+  commentary "(No rossoctl MLflow roles found yet)"
 
 pause "Stage 3 complete"

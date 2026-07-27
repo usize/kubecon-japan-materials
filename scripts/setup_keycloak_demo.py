@@ -10,7 +10,7 @@ Creates/assigns:
   1. Audience scope `agent-team1-finance-news-agent-aud` — puts the agent's
      SPIFFE id in the token `aud`, so scripted (ROPC) calls pass the agent
      sidecar's inbound jwt-validation. Assigned as DEFAULT on the ROPC client.
-     (The kagenti UI mints agent-audienced tokens via its own exchange, so
+     (The rossoctl UI mints agent-audienced tokens via its own exchange, so
      browser chats don't need this.)
   2. Public direct-access (ROPC) client `finance-news-e2e` — scripted
      end-to-end tests without a browser.
@@ -36,7 +36,7 @@ import sys
 from keycloak import KeycloakAdmin
 
 KEYCLOAK_URL = os.environ.get("KEYCLOAK_URL", "http://keycloak.localtest.me:8080")
-KEYCLOAK_REALM = os.environ.get("KEYCLOAK_REALM", "kagenti")
+KEYCLOAK_REALM = os.environ.get("KEYCLOAK_REALM", "rossoctl")
 ADMIN_USER = os.environ.get("KEYCLOAK_ADMIN_USERNAME", "admin")
 ADMIN_PASS = os.environ.get("KEYCLOAK_ADMIN_PASSWORD", "admin")
 NAMESPACE = os.environ.get("NAMESPACE", "team1")

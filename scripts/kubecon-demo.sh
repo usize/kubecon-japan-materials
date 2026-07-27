@@ -8,7 +8,7 @@
 #   - MCP Gateway registrations
 #   - Untrusted curl pod (for mTLS contrast)
 #
-# The agent is deployed LIVE from the Kagenti UI during the demo.
+# The agent is deployed LIVE from the Rossoctl UI during the demo.
 #
 # Usage: ./scripts/kubecon-demo.sh
 # ============================================================================
@@ -46,9 +46,8 @@ kubectl apply \
   -f "$DEMO_DIR/k8s/news-server-httproute.yaml" \
   -f "$DEMO_DIR/k8s/news-server-registration.yaml"
 
-kubectl -n mcp-system rollout restart deploy/mcp-gateway deploy/mcp-gateway-controller
+kubectl -n mcp-system rollout restart deploy/mcp-gateway
 kubectl -n mcp-system rollout status deploy/mcp-gateway --timeout=60s
-kubectl -n mcp-system rollout status deploy/mcp-gateway-controller --timeout=60s
 
 commentary "Waiting for all MCPServerRegistrations to go Ready..."
 for reg in finance-mcp-servers finance-tool-servers news-server; do
@@ -77,6 +76,6 @@ echo "  Gateway tools:     $(kubectl get mcpserverregistrations -n "$NAMESPACE" 
 echo "  Evil-server:       running (logs empty)"
 echo "  Untrusted pod:     ready"
 echo ""
-echo "  Next: deploy finance-news-agent from the Kagenti UI"
-echo "  UI:   http://kagenti-ui.localtest.me:8080"
+echo "  Next: deploy finance-news-agent from the Rossoctl UI"
+echo "  UI:   http://rossoctl-ui.localtest.me:8080"
 echo ""

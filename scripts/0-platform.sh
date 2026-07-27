@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================================
 # Stage 0: Platform Setup
-# Creates a Kind cluster and installs the kagenti platform stack.
+# Creates a Kind cluster and installs the rossoctl platform stack.
 # Pass --skip-cluster to reuse an existing cluster.
 # ============================================================================
 set -euo pipefail
@@ -39,7 +39,7 @@ fi
 
 # ── Create cluster + install platform ───────────────────────────────────────
 if [ "$SKIP_CLUSTER" = false ]; then
-  pause "Will create Kind cluster '$CLUSTER_NAME' and install the kagenti platform stack"
+  pause "Will create Kind cluster '$CLUSTER_NAME' and install the rossoctl platform stack"
 
   bash "$SETUP_SCRIPT" \
     --cluster-name "$CLUSTER_NAME" \
@@ -47,7 +47,7 @@ if [ "$SKIP_CLUSTER" = false ]; then
     --with-mcp-gateway \
     --with-ui \
     --with-mlflow \
-    --kagenti-deps-values "$DEMO_DIR/k8s/kagenti-deps-values.yaml"
+    --rossoctl-deps-values "$DEMO_DIR/k8s/rossoctl-deps-values.yaml"
 else
   commentary "Skipping cluster creation (--skip-cluster). Using existing cluster."
 fi
@@ -58,6 +58,6 @@ kubectl get pods -n "$PLATFORM_NS"      --no-headers | head -20
 kubectl get pods -n gateway-system       --no-headers 2>/dev/null | head -10 || true
 kubectl get pods -n mcp-system           --no-headers 2>/dev/null | head -10 || true
 kubectl get pods -n keycloak             --no-headers 2>/dev/null | head -10 || true
-kubectl get pods -n spire-system         --no-headers 2>/dev/null | head -10 || true
+kubectl get pods -n zero-trust-workload-identity-manager --no-headers 2>/dev/null | head -10 || true
 
 pause "Platform deployed — all core components running"

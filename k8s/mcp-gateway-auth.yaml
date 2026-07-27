@@ -20,8 +20,8 @@ spec:
       group: gateway.networking.k8s.io
       name: mcp-gateway
   jwtRules:
-    - issuer: "http://keycloak.localtest.me:8080/realms/kagenti"
-      jwksUri: "http://keycloak-service.keycloak.svc.cluster.local:8080/realms/kagenti/protocol/openid-connect/certs"
+    - issuer: "http://keycloak.localtest.me:8080/realms/rossoctl"
+      jwksUri: "http://keycloak-service.keycloak.svc.cluster.local:8080/realms/rossoctl/protocol/openid-connect/certs"
       audiences:
         - "mcp-gateway"
       forwardOriginalToken: true

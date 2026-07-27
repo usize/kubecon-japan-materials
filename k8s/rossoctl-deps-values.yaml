@@ -1,13 +1,13 @@
-# kagenti-deps helm values for the Kubecon Japan demo platform.
+# rossoctl-deps helm values for the Kubecon Japan demo platform.
 #
 # Configures MLflow's LLM judge backend to use local Ollama on the host
 # (OpenAI-compatible API) so judges/scorers can be created on the fly
 # from the MLflow UI — no external API keys required.
 #
 # Consumed by scripts/0-platform.sh via:
-#   setup-kagenti.sh --kagenti-deps-values k8s/kagenti-deps-values.yaml
+#   setup-rossoctl.sh --rossoctl-deps-values k8s/rossoctl-deps-values.yaml
 #
-# Requires the kagenti fork branch fix/mlflow-scorer-job-runner (see env.sh),
+# Requires the rossoctl fork branch fix/mlflow-scorer-job-runner-v2 (see env.sh),
 # which templates these into the mlflow Deployment and starts the Huey
 # job runner that executes judge/scorer jobs.
 mlflow:
