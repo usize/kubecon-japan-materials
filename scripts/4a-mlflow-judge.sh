@@ -27,10 +27,27 @@ detecting prompt injection after the fact."
 commentary "Building and deploying the financial news agent with OTEL/MLflow
 tracing enabled. The agent.yaml includes OTEL_EXPORTER_OTLP_ENDPOINT,
 OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, and MLFLOW_EXPERIMENT_NAME.
-Traces will appear in the 'team1' MLflow experiment."
+Traces will appear in the 'team1' MLflow experiment.
+(News-server and tainted-server were deployed in Stage 1.)"
 
-make -C "$IBAC_DEMO_DIR" build-images load-images deploy wait-pods \
-  CONTAINER_RUNTIME="$CONTAINER_RUNTIME"
+KIND_NODE="${CLUSTER_NAME}-control-plane"
+AGENT_IMAGE="finance-news-agent:latest"
+
+"$CONTAINER_RUNTIME" build -f "$IBAC_DEMO_DIR/agent/Dockerfile" \
+  -t "$AGENT_IMAGE" "$IBAC_DEMO_DIR"
+kind load docker-image "$AGENT_IMAGE" --name "$CLUSTER_NAME"
+"$CONTAINER_RUNTIME" exec "$KIND_NODE" \
+  ctr -n k8s.io images tag "localhost/$AGENT_IMAGE" "docker.io/library/$AGENT_IMAGE" \
+  >/dev/null 2>&1 || true
+
+kubectl apply -f "$IBAC_DEMO_DIR/k8s/agent.yaml"
+wait_rollout "$NAMESPACE" finance-news-agent 180s
+
+# Wait for operator to create the authbridge ConfigMap
+for i in $(seq 1 60); do
+  kubectl -n "$NAMESPACE" get cm authbridge-config-finance-news-agent >/dev/null 2>&1 && break
+  sleep 2
+done
 
 pause "Financial news agent deployed with MLflow tracing"
 

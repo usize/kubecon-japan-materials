@@ -136,6 +136,54 @@ var tools = []Tool{
 
 // --- Tool execution ---
 
+// ensureMCPSession initializes an MCP session with the gateway if one
+// hasn't been established yet.  The gateway returns a Mcp-Session-Id
+// header on a successful initialize response; we cache it for the
+// lifetime of the process.
+func ensureMCPSession(gatewayURL, userToken string) error {
+	if mcpSessionID != "" {
+		return nil
+	}
+	rpc := struct {
+		JSONRPC string `json:"jsonrpc"`
+		ID      string `json:"id"`
+		Method  string `json:"method"`
+		Params  any    `json:"params"`
+	}{
+		JSONRPC: "2.0",
+		ID:      newUUID(),
+		Method:  "initialize",
+		Params: map[string]any{
+			"protocolVersion": "2025-03-26",
+			"capabilities":   map[string]any{},
+			"clientInfo":     map[string]any{"name": "finance-news-agent", "version": "1.0"},
+		},
+	}
+	body, _ := json.Marshal(rpc)
+	req, err := http.NewRequest(http.MethodPost, gatewayURL+"/mcp", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("initialize request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	if userToken != "" {
+		req.Header.Set("Authorization", userToken)
+	}
+	resp, err := proxiedClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("initialize call: %w", err)
+	}
+	defer resp.Body.Close()
+	io.ReadAll(resp.Body) // drain
+	sid := resp.Header.Get("Mcp-Session-Id")
+	if sid == "" {
+		return fmt.Errorf("gateway did not return Mcp-Session-Id (HTTP %d)", resp.StatusCode)
+	}
+	mcpSessionID = sid
+	log.Printf("[Agent] MCP session established: %.40s...", sid)
+	return nil
+}
+
 // execGetNews fetches news by calling the news server's MCP endpoint.
 // NEWS_URL may point at the news server directly or at the MCP Gateway.
 // When routed via the gateway, NEWS_TOOL_NAME must include the tool prefix
@@ -153,6 +201,12 @@ func execGetNews(args map[string]interface{}, userToken string) string {
 	if ticker == "" {
 		ticker = "AAPL"
 	}
+
+	// Ensure we have an MCP session with the gateway
+	if err := ensureMCPSession(newsURL, userToken); err != nil {
+		log.Printf("[Agent] MCP session init failed: %v", err)
+	}
+
 	rpc := struct {
 		JSONRPC string         `json:"jsonrpc"`
 		ID      string         `json:"id"`
@@ -176,6 +230,9 @@ func execGetNews(args map[string]interface{}, userToken string) string {
 		return fmt.Sprintf("error creating MCP request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if mcpSessionID != "" {
+		req.Header.Set("Mcp-Session-Id", mcpSessionID)
+	}
 	if userToken != "" {
 		req.Header.Set("Authorization", userToken)
 	}
@@ -187,6 +244,28 @@ func execGetNews(args map[string]interface{}, userToken string) string {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Sprintf("error reading MCP response: %v", err)
+	}
+
+	// If session expired, reset and retry once
+	if strings.Contains(string(body), "no session ID found") || strings.Contains(string(body), "session not found") {
+		log.Printf("[Agent] MCP session expired, re-initializing...")
+		mcpSessionID = ""
+		if err := ensureMCPSession(newsURL, userToken); err != nil {
+			return fmt.Sprintf("MCP session re-init failed: %v", err)
+		}
+		// Retry the call
+		req2, _ := http.NewRequest(http.MethodPost, newsURL+"/mcp", bytes.NewReader(reqBody))
+		req2.Header.Set("Content-Type", "application/json")
+		req2.Header.Set("Mcp-Session-Id", mcpSessionID)
+		if userToken != "" {
+			req2.Header.Set("Authorization", userToken)
+		}
+		resp2, err := proxiedClient.Do(req2)
+		if err != nil {
+			return fmt.Sprintf("error calling MCP get_news (retry): %v", err)
+		}
+		defer resp2.Body.Close()
+		body, _ = io.ReadAll(resp2.Body)
 	}
 
 	var mcp struct {
@@ -217,6 +296,7 @@ func execGetNews(args map[string]interface{}, userToken string) string {
 }
 
 var proxiedClient *http.Client
+var mcpSessionID string // MCP Gateway session (populated on first tools/call)
 
 func buildProxiedClient() *http.Client {
 	proxyEnv := os.Getenv("HTTP_PROXY")

@@ -123,9 +123,12 @@ def main() -> int:
     gw_internal = kc.get_client_id(GATEWAY_CLIENT_ID)
     print(f"  gateway audience client {GATEWAY_CLIENT_ID} -> {gw_internal}")
 
-    # 5) Gateway audience scope, OPTIONAL on the agent's registered client so
-    #    explicit scope="openid mcp-gateway-aud" grants succeed
+    # 5) Gateway audience scope — DEFAULT on the mcp-gateway client itself so
+    #    its client_credentials tokens include "mcp-gateway" in aud (required by
+    #    the Istio AuthorizationPolicy). OPTIONAL on the agent's registered client
+    #    so explicit scope="openid mcp-gateway-aud" grants succeed.
     gw_scope_id = get_or_create_scope(kc, GATEWAY_AUD_SCOPE, GATEWAY_CLIENT_ID)
+    add_scope(kc, gw_internal, gw_scope_id, "default", "mcp-gateway client")
     for candidate in (AGENT_SPIFFE, AGENT_SA):
         agent_internal = kc.get_client_id(candidate)
         if agent_internal:

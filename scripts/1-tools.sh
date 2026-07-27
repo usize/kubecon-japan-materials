@@ -74,16 +74,32 @@ commentary "Registering finance-tool with the MCP Gateway via HTTPRoute + MCPSer
 kubectl apply -f "$DEMO_DIR/k8s/finance-tool-httproute.yaml"
 kubectl apply -f "$DEMO_DIR/k8s/finance-tool-registration.yaml"
 
+# ── Build + deploy news-server and tainted-server ────────────────────────
+commentary "Building and deploying the news-server (poisoned news) and tainted-server (exfil target)..."
+make -C "$IBAC_DEMO_DIR" build-images load-images \
+  CONTAINER_RUNTIME="$CONTAINER_RUNTIME" KIND_CLUSTER_NAME="$CLUSTER_NAME"
+kubectl apply -f "$IBAC_DEMO_DIR/k8s/news-server.yaml"
+kubectl apply -f "$IBAC_DEMO_DIR/k8s/tainted-server.yaml"
+wait_rollout "$NAMESPACE" ibac-news-server
+wait_rollout "$NAMESPACE" ibac-tainted-server
+
+# ── Register news-server with MCP Gateway ────────────────────────────────
+commentary "Registering news-server with the MCP Gateway..."
+kubectl apply -f "$DEMO_DIR/k8s/news-server-httproute.yaml"
+kubectl apply -f "$DEMO_DIR/k8s/news-server-registration.yaml"
+
+pause "All tool backends deployed"
+
 # ── Restart MCP Gateway broker ───────────────────────────────────────────
-# Restart after both tools are registered so the broker picks up both
-# backends in a single reconnect cycle.
+# Restart after all tools are registered so the broker picks up every
+# backend in a single reconnect cycle.
 commentary "Restarting MCP Gateway broker to pick up new registrations..."
 kubectl -n mcp-system rollout restart deploy/mcp-gateway
 kubectl -n mcp-system rollout status deploy/mcp-gateway --timeout=60s
 
-# Wait for both registrations to be accepted
+# Wait for registrations to be accepted
 commentary "Waiting for MCPServerRegistrations to be ready..."
-for reg in finance-mcp-servers finance-tool-servers; do
+for reg in finance-mcp-servers finance-tool-servers news-server; do
   for i in $(seq 1 60); do
     if kubectl get mcpserverregistrations -n "$NAMESPACE" "$reg" \
          -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q True; then
@@ -95,7 +111,7 @@ done
 
 kubectl get mcpserverregistrations -n "$NAMESPACE"
 
-pause "Both tool backends registered with MCP Gateway"
+pause "All tool backends registered with MCP Gateway"
 
 # ── Apply auth policies to the MCP Gateway ────────────────────────────────
 commentary "Applying Istio auth policies to the MCP Gateway.
