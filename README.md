@@ -1,6 +1,6 @@
-# Securing Agentic AI at the Infrastructure Layer
+# Architecting Secure Agentic Workflows on Kubernetes
 
-Demo materials for the Kubecon Japan 2026 talk on identity, authorization, and runtime guardrails for agentic systems.
+Demo materials for the KubeCon Japan 2026 talk on identity, authorization, and runtime guardrails for agentic AI systems.
 
 ## Running the demo
 
@@ -41,17 +41,27 @@ Each stage pauses for Enter at key moments. Press Enter to advance, Ctrl-C to st
 | `scripts/4a-mlflow-judge.sh` | Deploys the news agent with OTEL tracing, runs the injection scenario, evaluates with a custom MLflow judge |
 | `scripts/4b-ibac.sh` | Shows the same injection blocked in real-time by the IBAC sidecar plugin |
 
+### Live demo scripts
+
+These scripts are used for the live KubeCon presentation. They pre-deploy everything except the agent (which is deployed live from the Rossoctl UI).
+
+| Script | What it does |
+|--------|-------------|
+| `scripts/kubecon-demo.sh` | Pre-deploys tool backends, MCP registrations, and untrusted pod |
+| `scripts/kubecon-reset.sh` | Resets the team1 namespace for a fresh demo run (keeps the cluster) |
+
 ### Utility scripts
 
 | Script | What it does |
 |--------|-------------|
 | `scripts/show-creds.sh` | Prints service URLs and login credentials for the running cluster |
 | `scripts/demo-mcp-auth.sh` | Demonstrates MCP Gateway auth enforcement (no-token vs valid-token) |
+| `scripts/decode-jwt.sh` | Decodes and pretty-prints a JWT token's header and payload |
 | `scripts/teardown.sh` | Removes demo workloads (add `--destroy-cluster` to delete the Kind cluster) |
 
 ### Platform source
 
-The platform is installed from a fork of [kagenti/kagenti](https://github.com/kagenti/kagenti) with a fix for the MLflow scorer job runner ([#1605](https://github.com/kagenti/kagenti/issues/1605)). The `env.sh` file auto-clones from `usize/kagenti` on the `fix/mlflow-scorer-job-runner` branch if `thirdparty/kagenti` is not present.
+The platform is installed from a fork of [kagenti/kagenti](https://github.com/kagenti/kagenti) with a fix for the MLflow scorer job runner ([#1605](https://github.com/kagenti/kagenti/issues/1605)). The `env.sh` file auto-clones from `usize/kagenti` on the `fix/mlflow-scorer-job-runner-v2` branch if `thirdparty/kagenti` is not present.
 
 ## Talk narrative
 
@@ -63,32 +73,29 @@ The platform is installed from a fork of [kagenti/kagenti](https://github.com/ka
 
 ## Slide deck
 
-Slides are in `slides.md` (Marp format).
-
-```bash
-npm install
-npm run serve      # Live preview with hot-reload
-npm run build      # Build static site to docs/
-npm run build:pdf  # Export to PDF
-```
+Slides are in `KubeCon_CloudNativeCon_Japan_2026_Architecting Secure Agentic Workflows on Kubernetes.pptx`.
 
 ## Directory layout
 
 ```
+├── *.pptx                           # Talk slides (PowerPoint)
 ├── env.sh                           # Shared environment (auto-clones kagenti)
-├── slides.md                        # Talk slides (Marp)
-├── kubecon-japan-demo-playbook.md   # Detailed demo playbook
 ├── scripts/
 │   ├── demo.sh                     # Master orchestrator
 │   ├── 0-platform.sh .. 4b-ibac.sh # Stage scripts
+│   ├── kubecon-demo.sh             # Live demo pre-deploy
+│   ├── kubecon-reset.sh            # Reset namespace for fresh run
 │   ├── show-creds.sh               # Credential helper
+│   ├── decode-jwt.sh               # JWT decoder
 │   ├── demo-mcp-auth.sh            # MCP Gateway auth demo
 │   ├── mlflow-judge/run_judge.py   # Custom prompt injection judge
 │   └── lib.sh                      # Shared helpers (colors, pause)
 ├── finance-ibac/                    # IBAC demo (agent, news server, tainted server)
+├── finance-tool/                    # Finance MCP tool server
 ├── k8s/                            # Kubernetes manifests (MCP registrations, auth policies)
-├── thirdparty/                     # Auto-cloned dependencies (gitignored)
-│   ├── kagenti/                    # Platform (usize/kagenti fork)
-│   └── kagenti-extensions/         # AuthBridge, demos
-└── docs/                           # Static site (GitHub Pages)
+├── images/                          # Slide images
+├── videos/                          # Demo recordings
+└── thirdparty/                     # Auto-cloned dependencies (gitignored)
+    ├── kagenti/                    # Platform (usize/kagenti fork)
+    └── kagenti-extensions/         # AuthBridge sidecar and demos
 ```
