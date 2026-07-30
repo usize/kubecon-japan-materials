@@ -61,7 +61,7 @@ These scripts are used for the live KubeCon presentation. They pre-deploy everyt
 
 ### Platform source
 
-The platform is installed from a fork of [kagenti/kagenti](https://github.com/kagenti/kagenti) with a fix for the MLflow scorer job runner ([#1605](https://github.com/kagenti/kagenti/issues/1605)). The `env.sh` file auto-clones from `usize/kagenti` on the `fix/mlflow-scorer-job-runner-v2` branch if `thirdparty/kagenti` is not present.
+The platform is installed from a fork of [rossoctl/rossoctl](https://github.com/rossoctl/rossoctl) (formerly Kagenti) with a fix for the MLflow scorer job runner ([#1605](https://github.com/kagenti/kagenti/issues/1605)). The `env.sh` file auto-clones from `usize/kagenti` on the `fix/mlflow-scorer-job-runner-v2` branch if `thirdparty/kagenti` is not present.
 
 ## Talk narrative
 
