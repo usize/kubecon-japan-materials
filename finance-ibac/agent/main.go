@@ -496,10 +496,13 @@ func extractBlockedBody(httpResult string) string {
 }
 
 func runAgent(query string, sessionID string, userToken string) (string, error) {
+	inputsJSON, _ := json.Marshal(map[string]string{"query": query})
 	ctx, span := tracer.Start(context.Background(), "agent.run",
 		trace.WithAttributes(
 			attribute.String("user.query", query),
 			attribute.String("session.id", sessionID),
+			attribute.String("mlflow.spanType", "AGENT"),
+			attribute.String("mlflow.spanInputs", string(inputsJSON)),
 		))
 	defer span.End()
 	_ = ctx // used by traced tool calls below
@@ -519,6 +522,7 @@ func runAgent(query string, sessionID string, userToken string) (string, error) 
 				attribute.Int("llm.iteration", i),
 				attribute.Int("llm.message_count", len(messages)),
 				attribute.String("llm.model", envOr("OLLAMA_MODEL", "llama3.2:3b")),
+				attribute.String("mlflow.spanType", "LLM"),
 			))
 		resp, err := callOllama(messages, true)
 		if err != nil {
@@ -562,6 +566,8 @@ func runAgent(query string, sessionID string, userToken string) (string, error) 
 				continue
 			} else {
 				log.Printf("[Agent] Final response (iteration %d): %s", i, msg.Content)
+				outputsJSON, _ := json.Marshal(map[string]string{"response": msg.Content})
+				span.SetAttributes(attribute.String("mlflow.spanOutputs", string(outputsJSON)))
 				return msg.Content, nil
 			}
 		}
@@ -580,6 +586,8 @@ func runAgent(query string, sessionID string, userToken string) (string, error) 
 				trace.WithAttributes(
 					attribute.String("tool.name", tc.Function.Name),
 					attribute.String("tool.arguments", tc.Function.Arguments),
+					attribute.String("mlflow.spanType", "TOOL"),
+					attribute.String("mlflow.spanInputs", tc.Function.Arguments),
 				))
 
 			var result string
@@ -604,7 +612,11 @@ func runAgent(query string, sessionID string, userToken string) (string, error) 
 			if len(resultAttr) > 4096 {
 				resultAttr = resultAttr[:4096] + "... (truncated)"
 			}
-			toolSpan.SetAttributes(attribute.String("tool.result", resultAttr))
+			toolOutputJSON, _ := json.Marshal(map[string]string{"result": resultAttr})
+			toolSpan.SetAttributes(
+				attribute.String("tool.result", resultAttr),
+				attribute.String("mlflow.spanOutputs", string(toolOutputJSON)),
+			)
 			toolSpan.End()
 
 			log.Printf("[Agent] Tool result (%s): %.200s...", tc.Function.Name, result)
@@ -615,7 +627,10 @@ func runAgent(query string, sessionID string, userToken string) (string, error) 
 
 		if blockedCount >= maxBlocked {
 			log.Printf("[Agent] %d http_post call(s) returned 403; bailing out (platform body: %s)", blockedCount, blockedBody)
-			return fmt.Sprintf(toolBlockedRefusalTemplate, blockedBody), nil
+			result := fmt.Sprintf(toolBlockedRefusalTemplate, blockedBody)
+			outputsJSON, _ := json.Marshal(map[string]string{"response": result})
+			span.SetAttributes(attribute.String("mlflow.spanOutputs", string(outputsJSON)))
+			return result, nil
 		}
 	}
 	return "", fmt.Errorf("tool-calling loop exceeded max iterations")
