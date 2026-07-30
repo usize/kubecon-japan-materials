@@ -1,3 +1,5 @@
+🇯🇵 [日本語版READMEはこちら](README.ja.md)
+
 # Architecting Secure Agentic Workflows on Kubernetes
 
 Demo materials for the KubeCon Japan 2026 talk on identity, authorization, and runtime guardrails for agentic AI systems.
@@ -6,9 +8,7 @@ Demo materials for the KubeCon Japan 2026 talk on identity, authorization, and r
 
 Built on the [Rossoctl](https://github.com/rossoctl/rossoctl) agent platform.
 
-## Running the demo
-
-### Prerequisites
+## Prerequisites
 
 - `kind`, `kubectl`, `helm` (v3)
 - `docker` or `podman`
@@ -19,53 +19,36 @@ Built on the [Rossoctl](https://github.com/rossoctl/rossoctl) agent platform.
 ollama pull llama3.2:3b
 ```
 
-### Quick start
+## Running the demo
+
+A single script walks through the entire demo step by step. It creates a Kind cluster, installs the platform, and runs each stage in sequence — pausing for Enter at key moments so you can follow along.
 
 ```bash
-# Full demo — creates Kind cluster, installs platform, runs all stages
 bash scripts/demo.sh
+```
 
-# Skip cluster creation (reuse existing)
+The stages are:
+
+1. **Platform** — Creates a Kind cluster and installs SPIRE, Keycloak, MCP Gateway, MLflow, and the Rossoctl UI.
+2. **Tool servers** — Builds and deploys the MCP tool backends (market data, transactions, news) and registers them with the gateway.
+3. **Identity** — Deploys the agent with a SPIFFE identity and shows that an untrusted pod is rejected.
+4. **Happy path** — Configures auth and walks through a live financial query via the UI.
+5. **Prompt injection + MLflow judge** — Deploys a news-capable agent, demonstrates a prompt injection attack, and evaluates the trace with a custom MLflow judge.
+6. **IBAC guardrail** — Replays the same attack, now blocked in real-time by the IBAC sidecar plugin.
+
+If you already have a cluster running, you can skip platform setup or jump to a specific stage:
+
+```bash
 bash scripts/demo.sh --skip-platform
-
-# Jump to a specific stage (assumes earlier stages completed)
 bash scripts/demo.sh --skip-platform --start-from 3
 ```
 
-Each stage pauses for Enter at key moments. Press Enter to advance, Ctrl-C to stop.
+To tear everything down:
 
-### Individual stages
-
-| Script | What it does |
-|--------|-------------|
-| `scripts/0-platform.sh` | Creates a Kind cluster and installs the kagenti platform (SPIRE, Keycloak, MCP Gateway, MLflow, UI) |
-| `scripts/1-tools.sh` | Builds and deploys MCP tool servers, registers them with the MCP Gateway |
-| `scripts/2-identity.sh` | Deploys the agent with SPIFFE identity, contrasts with an untrusted pod |
-| `scripts/3-happy-path.sh` | Configures auth, guides a live financial query through the UI |
-| `scripts/4a-mlflow-judge.sh` | Deploys the news agent with OTEL tracing, runs the injection scenario, evaluates with a custom MLflow judge |
-| `scripts/4b-ibac.sh` | Shows the same injection blocked in real-time by the IBAC sidecar plugin |
-
-### Live demo scripts
-
-These scripts are used for the live KubeCon presentation. They pre-deploy everything except the agent (which is deployed live from the Rossoctl UI).
-
-| Script | What it does |
-|--------|-------------|
-| `scripts/kubecon-demo.sh` | Pre-deploys tool backends, MCP registrations, and untrusted pod |
-| `scripts/kubecon-reset.sh` | Resets the team1 namespace for a fresh demo run (keeps the cluster) |
-
-### Utility scripts
-
-| Script | What it does |
-|--------|-------------|
-| `scripts/show-creds.sh` | Prints service URLs and login credentials for the running cluster |
-| `scripts/demo-mcp-auth.sh` | Demonstrates MCP Gateway auth enforcement (no-token vs valid-token) |
-| `scripts/decode-jwt.sh` | Decodes and pretty-prints a JWT token's header and payload |
-| `scripts/teardown.sh` | Removes demo workloads (add `--destroy-cluster` to delete the Kind cluster) |
-
-### Platform source
-
-The platform is installed from a fork of [rossoctl/rossoctl](https://github.com/rossoctl/rossoctl) (formerly Kagenti) with a fix for the MLflow scorer job runner ([#1605](https://github.com/kagenti/kagenti/issues/1605)). The `env.sh` file auto-clones from `usize/kagenti` on the `fix/mlflow-scorer-job-runner-v2` branch if `thirdparty/kagenti` is not present.
+```bash
+bash scripts/teardown.sh               # Remove demo workloads
+bash scripts/teardown.sh --destroy-cluster  # Also delete the Kind cluster
+```
 
 ## Talk narrative
 
@@ -73,33 +56,8 @@ The platform is installed from a fork of [rossoctl/rossoctl](https://github.com/
 
 **Part Two — Demonstrating the unique failure mode.** Identity and access control are necessary but not sufficient. A prompt injection hidden in a news article tricks the agent into exfiltrating data — the attack succeeds despite the agent having proper identity. MLflow captures the full trace.
 
-**Part Three — Closing the loop.** We use MLflow's built-in judges to score the agent's behavior post-hoc, detecting the injection in recorded traces. Then we apply the same judge logic as a real-time guardrail (IBAC sidecar plugin) that blocks the exfiltration before it leaves the pod. No agent code changes — infrastructure handles it.
+**Part Three — Closing the loop.** We use MLflow's custom judges to score the agent's behavior post-hoc, detecting the injection in recorded traces. Then we apply the same judge logic as a real-time guardrail (IBAC sidecar plugin) that blocks the exfiltration before it leaves the pod. No agent code changes — infrastructure handles it.
 
-## Slide deck
+## Platform source
 
-Slides are in `KubeCon_CloudNativeCon_Japan_2026_Architecting Secure Agentic Workflows on Kubernetes.pptx`.
-
-## Directory layout
-
-```
-├── *.pptx                           # Talk slides (PowerPoint)
-├── env.sh                           # Shared environment (auto-clones kagenti)
-├── scripts/
-│   ├── demo.sh                     # Master orchestrator
-│   ├── 0-platform.sh .. 4b-ibac.sh # Stage scripts
-│   ├── kubecon-demo.sh             # Live demo pre-deploy
-│   ├── kubecon-reset.sh            # Reset namespace for fresh run
-│   ├── show-creds.sh               # Credential helper
-│   ├── decode-jwt.sh               # JWT decoder
-│   ├── demo-mcp-auth.sh            # MCP Gateway auth demo
-│   ├── mlflow-judge/run_judge.py   # Custom prompt injection judge
-│   └── lib.sh                      # Shared helpers (colors, pause)
-├── finance-ibac/                    # IBAC demo (agent, news server, tainted server)
-├── finance-tool/                    # Finance MCP tool server
-├── k8s/                            # Kubernetes manifests (MCP registrations, auth policies)
-├── images/                          # Slide images
-├── videos/                          # Demo recordings
-└── thirdparty/                     # Auto-cloned dependencies (gitignored)
-    ├── kagenti/                    # Platform (usize/kagenti fork)
-    └── kagenti-extensions/         # AuthBridge sidecar and demos
-```
+The platform is installed from a fork of [rossoctl/rossoctl](https://github.com/rossoctl/rossoctl) with a fix for the MLflow scorer job runner ([#1605](https://github.com/rossoctl/rossoctl/issues/1605)). The `env.sh` file auto-clones from `usize/rossoctl` on the `fix/mlflow-scorer-job-runner-v2` branch if `thirdparty/rossoctl` is not present.
