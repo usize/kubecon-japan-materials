@@ -2,6 +2,10 @@
 
 Demo materials for the KubeCon Japan 2026 talk on identity, authorization, and runtime guardrails for agentic AI systems.
 
+[![Built on Rossoctl](images/rossoctl.png)](https://github.com/rossoctl/rossoctl)
+
+Built on the [Rossoctl](https://github.com/rossoctl/rossoctl) agent platform.
+
 ## Running the demo
 
 ### Prerequisites
